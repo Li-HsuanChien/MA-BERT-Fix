@@ -14,9 +14,9 @@ class MAAModel(BertPreTrainedModel):
         super().__init__(config)
         self.config = config
         self.num_labels = config.num_labels
-        self.cus_config = kwargs['cus_config']
-        self.type = self.cus_config.type # a,b,c,d
-        #'usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'
+        self.cus_config = kwargs['cus_config']  #'usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'
+        self.type = self.cus_config.type # a,b,c,d, e
+        
         
         if(self.cus_config.attributes == 'usr_ctgy'):
             # User embedding
@@ -69,6 +69,9 @@ class MAAModel(BertPreTrainedModel):
             self.fusion = Fusion(self.config.hidden_size,self.cus_config.attr_dim)
             self.layer = nn.ModuleList([BertLayer(config) for _ in range(self.cus_config.n_mmalayer)])
             self.classifier = BERTClassificationHead(config)
+        elif self.text == 'e':
+            #for kw
+            print("kw")
         else:
             self.classifier = BERTClassificationHeadWithAttribute(self.cus_config)
 
@@ -81,12 +84,21 @@ class MAAModel(BertPreTrainedModel):
             self,
             input_ids=None,
             attrs=None,
+            keywordstokens=None,
             attention_mask=None,
             token_type_ids=None,
             position_ids=None,
             head_mask=None,
             inputs_embeds=None,
     ):
+        
+        kw = self.bert(**keywordstokens)
+        
+        kw_hidden_state = kw.last_hidden_state
+        
+        keyword_embeddings = kw_hidden_state
+        print(keyword_embeddings)
+        exit() 
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -101,7 +113,7 @@ class MAAModel(BertPreTrainedModel):
         pool_output = outputs[1] # pooled hidden_state over [CLS] in the last layer
         all_hidden_states, all_attentions = outputs[2:] # (bs,)
 
-        usrs, prds, ctgys = attrs # (bs, ) * 2(3??)
+        usrs, prds, ctgys = attrs # (bs, ) * 3
         
             
         if(self.cus_config.attributes == 'usr_ctgy'):

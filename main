@@ -1,0 +1,1 @@
+!python run.py --run train --dataset google --mode maa --gpu 0,1 --version fine-tune --attributes usr_prd

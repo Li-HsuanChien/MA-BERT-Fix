@@ -74,12 +74,20 @@ def load_bert_sentences(config):
     users, products, category = processor.get_attributes()
     usr_stoi, prd_stoi, ctgy_stoi = load_attr_vocab(config.dataset, users, products, category)
     config.num_usrs, config.num_prds, config.num_ctgy = len(usr_stoi), len(prd_stoi), len(ctgy_stoi)
+    
+
+    #tbd: Add parallel kw additions, update data
+    
+    keyword = processor.get_keywords()
+    keyword_counter = processor.get_keyword_counter()
+    keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+    config.num_kws = len(keyword_stoi)
 
     config.TRAIN.num_train_optimization_steps = int(
         len(
             train_examples) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
 
-    return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi
+    return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keywordList, keyword_stoi
 
 
 def load_bert_documents(config):
@@ -89,9 +97,9 @@ def load_bert_documents(config):
 
     train_examples, dev_examples, test_examples = processor.get_documents()
 
-    train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], []
-    dev_texts, dev_labels, dev_users, dev_products, dev_category = [], [], [], [], []
-    test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], []
+    train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], [], []
+    dev_texts, dev_labels, dev_users, dev_products, dev_category  = [], [], [], [], [], []
+    test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], [], []
 
     for example in train_examples:
         train_texts.append(example.text)
@@ -129,11 +137,17 @@ def load_bert_documents(config):
     config.num_usrs, config.num_prds, config.num_ctgy = len(usr_stoi), len(prd_stoi), len(ctgy_stoi)
     config.num_labels = processor.NUM_CLASSES
 
+
+    keyword = processor.get_keywords()
+    keyword_counter = processor.get_keyword_counter()
+    keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+    config.num_kws = len(keyword_stoi)
+    
     print("Done!")
     config.TRAIN.num_train_optimization_steps = int(
         len(
             train_examples) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
-    return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi
+    return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keywordList, keyword_stoi
 
 
 def multi_acc(y, preds):
@@ -215,6 +229,21 @@ def load_attr_vocab(dataset, users, products, category):
         ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='ctgy')
     return usr_stoi, prd_stoi, ctgy_stoi
 
+def load_keywords(dataset, keyword_set, keyword_counter):
+   
+    try:
+        keyword_list = load_vocab(DATASET_PATH_MAP[dataset], field='keywordList')
+        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordVocab')
+    except Exception as e:
+        print(f"Error in load_attr_keyword: {e}")
+        keyword_list = list(keyword_set)
+        keyword_vocab = build_vocab(keyword_counter)
+        save_vectors(DATASET_PATH_MAP[dataset], keyword_list, field='keywordList')
+        save_vectors(DATASET_PATH_MAP[dataset], keyword_vocab, field='keywordVocab')
+        keyword_list = load_vocab(DATASET_PATH_MAP[dataset], field='keywordList')
+        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordVocab')
+    return keyword_list, 
+
 
 def load_document4baseline(config, tokenizer):
     processor = DATASET_MAP[config.dataset]()
@@ -259,8 +288,13 @@ def load_document4baseline(config, tokenizer):
     config.num_usrs = len(usr_stoi)
     config.num_prds = len(prd_stoi)
     config.num_ctgy = len(ctgy_stoi)
+    
+    keyword = processor.get_keywords()
+    keyword_counter = processor.get_keyword_counter()
+    keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+    config.num_kws = len(keyword_stoi)
 
-    return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi
+    return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keywordList, keyword_stoi
 
 
 def load_document4baseline_from_local(config):
@@ -290,12 +324,18 @@ def load_document4baseline_from_local(config):
         config.num_usrs = len(usr_stoi)
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
+        
+        keyword = processor.get_keywords()
+        keyword_counter = processor.get_keyword_counter()
+        keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+        config.num_kws = len(keyword_stoi)
+        
         config.TRAIN.num_train_optimization_steps = int(
             len(
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keywordList, keyword_stoi
     except Exception as e:
         print(f"Error in load_document4baseline_from_local: {e}")
         save_datasets(config)
@@ -315,17 +355,24 @@ def load_document4baseline_from_local(config):
         train_dataloader = DataLoader(train_dataset, batch_size=config.TRAIN.batch_size, shuffle=True)
         dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
         test_dataloader = DataLoader(test_dataset, batch_size=config.TEST.batch_size)
+        
         usr_itos, usr_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='usr')
         prd_itos, prd_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='prd')
         ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='ctgy')
         config.num_usrs = len(usr_stoi)
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
+        
+        keyword = processor.get_keywords()
+        keyword_counter = processor.get_keyword_counter()
+        keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+        config.num_kws = len(keyword_stoi)
+        
         config.TRAIN.num_train_optimization_steps = int(
             len(
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
 
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keywordList, keyword_stoi
 
 
 def save_datasets(config):

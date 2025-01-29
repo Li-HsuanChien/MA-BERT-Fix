@@ -16,14 +16,10 @@ class MAATrainer(object):
         pretrained_weights = 'bert-base-uncased'
         self.tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
 
-        self.train_itr, self.dev_itr, self.test_itr, self.usr_stoi, self.prd_stoi, self.ctgy_stoi = load_document4baseline_from_local(
+        self.train_itr, self.dev_itr, self.test_itr, self.usr_stoi, \
+        self.prd_stoi, self.ctgy_stoi, self.keyword_list, self.keyword_counter = load_document4baseline_from_local(
             config)
-        # print(len(self.ctgy_stoi))
-        # print(self.ctgy_stoi)
         
-        # for step, batch in enumerate(self.train_itr):
-        #     if step%6 ==0:
-        #       print(batch[4])
         model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config)
         if self.config.n_gpu > 1:
             self.net = torch.nn.DataParallel(model).to(config.device)
@@ -144,80 +140,82 @@ class MAATrainer(object):
                     break
 
     def train_epoch(self):
-      loss_fn = torch.nn.CrossEntropyLoss()
-      acc_fn = multi_acc
-      mse_fn = multi_mse
-      total_loss = []
-      total_acc = []
-      total_mse = []
-      start_time = 0.
-      resume_batch = True
-      
-      for step, batch in enumerate(self.train_itr):
-          
-          
-          torch.cuda.empty_cache()
-          if resume_batch:
-              start_time = time.time()
-          input_ids, label, usr, prd, ctgy = batch
-          input_ids = input_ids.to(self.config.device)
-          attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
-          labels = label.long().to(self.config.device)
-          usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
-          prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
-          ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
-          
-          try:
-              logits = self.net(input_ids=input_ids,
-                                attrs=(usr, prd, ctgy),
-                                attention_mask=attention_mask)[0]
-              
+        loss_fn = torch.nn.CrossEntropyLoss()
+        acc_fn = multi_acc
+        mse_fn = multi_mse
+        total_loss = []
+        total_acc = []
+        total_mse = []
+        start_time = 0.
+        resume_batch = True
+        
+        for step, batch in enumerate(self.train_itr):
+            
+            
+            torch.cuda.empty_cache()
+            if resume_batch:
+                start_time = time.time()
+            input_ids, label, usr, prd, ctgy, kw, kwcount = batch
+            input_ids = input_ids.to(self.config.device)
+            attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
+            labels = label.long().to(self.config.device)
+            usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
+            prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
+            ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
+            
+            try:
+                kwids = self.tokenizer(kw, return_tensors="pt", padding=True, truncation=True)
+                logits = self.net(input_ids=input_ids,
+                                    attrs=(usr, prd, ctgy),
+                                    keywords=kwids,
+                                    attention_mask=attention_mask)[0]
+                
 
-              loss = loss_fn(logits, labels)
-              metric_acc = acc_fn(labels, logits)
-              metric_mse = mse_fn(labels, logits)
-              total_loss.append(loss.data.cpu().numpy())
-              total_acc.append(metric_acc.data.cpu().numpy())
-              total_mse.append(metric_mse.data.cpu().numpy())
+                loss = loss_fn(logits, labels)
+                metric_acc = acc_fn(labels, logits)
+                metric_mse = mse_fn(labels, logits)
+                total_loss.append(loss.data.cpu().numpy())
+                total_acc.append(metric_acc.data.cpu().numpy())
+                total_mse.append(metric_mse.data.cpu().numpy())
 
-              if self.config.TRAIN.gradient_accumulation_steps > 1:
-                  loss = loss / self.config.TRAIN.gradient_accumulation_steps
+                if self.config.TRAIN.gradient_accumulation_steps > 1:
+                    loss = loss / self.config.TRAIN.gradient_accumulation_steps
 
-              loss.backward()
-              if (step + 1) % self.config.TRAIN.gradient_accumulation_steps == 0:
-                  self.optim.step()
-                  self.scheduler.step()
-                  self.optim.zero_grad()
+                loss.backward()
+                if (step + 1) % self.config.TRAIN.gradient_accumulation_steps == 0:
+                    self.optim.step()
+                    self.scheduler.step()
+                    self.optim.zero_grad()
 
-                  # Monitoring results on every batch * gradient_accumulation_steps
-                  end_time = time.time()
-                  span_time = (end_time - start_time) * (
-                      int(len(self.train_itr) - step)) // self.config.TRAIN.gradient_accumulation_steps
-                  h = span_time // (60 * 60)
-                  m = (span_time % (60 * 60)) // 60
-                  s = (span_time % (60 * 60)) % 60 // 1
-                  print(
-                      "\rIteration: {:>4}/{} ({:>4.1f}%) -- Loss: {:.5f} -ETA {:>2}h-{:>2}m-{:>2}s".format(
-                          step // self.config.TRAIN.gradient_accumulation_steps,
-                          int(len(self.train_itr) // self.config.TRAIN.gradient_accumulation_steps),
-                          100 * step / int(len(self.train_itr)),
-                          loss,
-                          int(h), int(m), int(s)),
-                      end="")
-                  resume_batch = True
-              else:
-                  resume_batch = False
+                    # Monitoring results on every batch * gradient_accumulation_steps
+                    end_time = time.time()
+                    span_time = (end_time - start_time) * (
+                        int(len(self.train_itr) - step)) // self.config.TRAIN.gradient_accumulation_steps
+                    h = span_time // (60 * 60)
+                    m = (span_time % (60 * 60)) // 60
+                    s = (span_time % (60 * 60)) % 60 // 1
+                    print(
+                        "\rIteration: {:>4}/{} ({:>4.1f}%) -- Loss: {:.5f} -ETA {:>2}h-{:>2}m-{:>2}s".format(
+                            step // self.config.TRAIN.gradient_accumulation_steps,
+                            int(len(self.train_itr) // self.config.TRAIN.gradient_accumulation_steps),
+                            100 * step / int(len(self.train_itr)),
+                            loss,
+                            int(h), int(m), int(s)),
+                        end="")
+                    resume_batch = True
+                else:
+                    resume_batch = False
 
-          except RuntimeError as exception:
-              if "out of memory" in str(exception):
-                  self.oom_time += 1
-                  if hasattr(torch.cuda, 'empty_cache'):
-                      torch.cuda.empty_cache()
-              else:
-                  print(str(exception))
-                  raise exception
+            except RuntimeError as exception:
+                if "out of memory" in str(exception):
+                    self.oom_time += 1
+                    if hasattr(torch.cuda, 'empty_cache'):
+                        torch.cuda.empty_cache()
+                else:
+                    print(str(exception))
+                    raise exception
 
-      return np.array(total_loss).mean(), np.array(total_acc).mean(), np.sqrt(np.array(total_mse).mean())
+        return np.array(total_loss).mean(), np.array(total_acc).mean(), np.sqrt(np.array(total_mse).mean())
 
     def eval(self, eval_itr):
         loss_fn = torch.nn.CrossEntropyLoss()

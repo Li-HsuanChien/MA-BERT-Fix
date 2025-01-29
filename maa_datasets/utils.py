@@ -6,8 +6,9 @@ import torch
 import pandas as pd
 import torch.utils.data
 from collections import Counter
+from keybert import KeyBERT
 
-csv.field_size_limit(sys.maxsize)
+csv.field_size_limit(1000000)
 
 
 class InputExample(object):
@@ -55,6 +56,7 @@ class SentenceProcessor(object):
           return examples
         except Exception as e:
           print(f"Create example error:{e}")
+          
     def _read_file(self, dataset):
         # Read the CSV file Add (structure out code)
         pd_reader = pd.read_csv(dataset, header=None, skiprows=0, encoding="utf-8", sep=r'\t\t', engine='python', on_bad_lines='skip')
@@ -127,6 +129,46 @@ class SentenceProcessor(object):
               products[document[ATTR_MAP["product"]]] += 1
               category[document[ATTR_MAP["category"]]] += 1
       return tuple([users, products, category]) 
+    
+    def _get_keywords(self, *datasets):
+        keywords = set()
+        # userspecificKws = []
+        ATTR_MAP = {
+          #'user': 0,  # assuming indices are integers and not strings
+          'text': 3,
+        }
+        for dataset in datasets:
+            for document in dataset:
+                # user = document[ATTR_MAP["user"]]
+                doc = document[ATTR_MAP["text"]]
+                kw_model = KeyBERT()
+                keywordList = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
+                rawKeywordList = [item[0] for item in keywordList]
+                for kw in rawKeywordList:
+                    keywords.add(kw)
+                    # userspecificKws.append({kw: user})
+        return keywords #[keywords,...]
+    
+    def _get_keyword_counter(self, *datasets):
+        keywordCounter = Counter()
+        # userspecificKws = []
+        ATTR_MAP = {
+        # 'user': 0,  # assuming indices are integers and not strings
+          'text': 3,
+        }
+        for dataset in datasets:
+            for document in dataset:
+                # user = document[ATTR_MAP["user"]]
+                doc = document[ATTR_MAP["text"]]
+                kw_model = KeyBERT()
+                keywordList = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
+                rawKeywordList = [item[0] for item in keywordList]
+                for kw in rawKeywordList:
+                    keywordCounter[kw] += 1
+                    # userspecificKws.append({kw: user})
+        #first list is for BERT processing, second is for attribute or mapped embedding processing
+        return keywordCounter             
+        
 
 
 class UnknownWordVecCache(object):
