@@ -41,12 +41,12 @@ class IMDB(SentenceProcessor):
         return self._get_attributes(self.d_train, self.d_dev,
                                     self.d_test)  # tuple(attributes) rather tuple(users, products)
 
-    def get_keywords(self):
-        return self._get_keywords(self.d_train, self.d_dev,
+    def get_keywords_and_counter(self):
+        return self._get_keywords_and_counter(self.d_train, self.d_dev,
                                     self.d_test)
-    def get_keyword_counter(self):
+    def get_polarzied_keywords(self):
         return self._get_keyword_counter(self.d_train, self.d_dev,
-                                    self.d_test)  
+                                    self.d_test, classes=self.NUM_CLASSES)  
 
 
 class YELP_13(SentenceProcessor):
@@ -74,12 +74,12 @@ class YELP_13(SentenceProcessor):
     def get_attributes(self):
         return self._get_attributes(self.d_train, self.d_dev,
                                     self.d_test)  # tuple(attributes) rather tuple(users, products)
-    def get_keywords(self):
-        return self._get_keywords(self.d_train, self.d_dev,
+    def get_keywords_and_counter(self):
+        return self._get_keywords_and_counter(self.d_train, self.d_dev,
                                     self.d_test)
-    def get_keyword_counter(self):
+    def get_polarzied_keywords(self):
         return self._get_keyword_counter(self.d_train, self.d_dev,
-                                    self.d_test)  
+                                    self.d_test, classes=self.NUM_CLASSES)  
 
 
 class YELP_14(SentenceProcessor):
@@ -106,12 +106,13 @@ class YELP_14(SentenceProcessor):
     def get_attributes(self):
         return self._get_attributes(self.d_train, self.d_dev,
                                     self.d_test)  # tuple(attributes) rather tuple(users, products)
-    def get_keywords(self):
-        return self._get_keywords(self.d_train, self.d_dev,
+
+    def get_keywords_and_counter(self):
+        return self._get_keywords_and_counter(self.d_train, self.d_dev,
                                     self.d_test)
-    def get_keyword_counter(self):
+    def get_polarzied_keywords(self):
         return self._get_keyword_counter(self.d_train, self.d_dev,
-                                    self.d_test)  
+                                    self.d_test, classes=self.NUM_CLASSES)  
 class GOOGLE(SentenceProcessor):
     NAME = 'GOOGLE'
     NUM_CLASSES = 5
@@ -142,12 +143,9 @@ class GOOGLE(SentenceProcessor):
     def get_attributes(self):
         return self._get_attributes(self.d_train, self.d_dev,
                                     self.d_test)
-    def get_keywords(self):
-        return self._get_keywords(self.d_train, self.d_dev,
-                                    self.d_test)
-    def get_keyword_counter(self):
-        return self._get_keyword_counter(self.d_train, self.d_dev,
-                                    self.d_test)    
+    def get_keywords_and_counter(self):
+        return self._get_keywords_and_counter(self.d_train, self.d_dev,
+                                    self.d_test)   
     
 class SST2(object):
     NAME = 'SST2'

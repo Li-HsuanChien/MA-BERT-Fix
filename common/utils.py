@@ -76,10 +76,8 @@ def load_bert_sentences(config):
     config.num_usrs, config.num_prds, config.num_ctgy = len(usr_stoi), len(prd_stoi), len(ctgy_stoi)
     
 
-    #tbd: Add parallel kw additions, update data
     
-    keyword = processor.get_keywords()
-    keyword_counter = processor.get_keyword_counter()
+    keyword, keyword_counter = processor.get_keywords_and_counter()
     keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
     config.num_kws = len(keyword_stoi)
 
@@ -138,8 +136,7 @@ def load_bert_documents(config):
     config.num_labels = processor.NUM_CLASSES
 
 
-    keyword = processor.get_keywords()
-    keyword_counter = processor.get_keyword_counter()
+    keyword, keyword_counter = processor.get_keywords_and_counter()
     keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
     config.num_kws = len(keyword_stoi)
     
@@ -201,10 +198,21 @@ def save_vectors(path, vocab, field='usr'):
     except Exception as e:
         print(f"Error in save_vector: {e}")
 
+def save_keyword_list(path, keywordlist, field='keywordList'):
+    
+    # list
+    try:
+      torch.save(keywordlist, os.path.join(path, '{}.pt'.format(field)))
+    except Exception as e:
+        print(f"Error in save_keywordList: {e}")
+
 def load_vocab(path, field='usr'):
     # itos, stoi, vectors, dim
     return torch.load(os.path.join(path, '{}.pt'.format(field)))
 
+def load_keyword_list(path, field='keywordList'):
+    # list
+    return torch.load(os.path.join(path, '{}.pt'.format(field)))
 
 def load_baselines_datasets(path, field='train', strategy='tail'):
     return torch.load(os.path.join(path, '{}_{}.pt'.format(field, strategy)))
@@ -218,6 +226,7 @@ def load_attr_vocab(dataset, users, products, category):
         ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='ctgy')
     except Exception as e:
         print(f"Error in load_attr_vocab: {e}")
+        print(f"Rebuilding attr vocab")
         usr_vocab = build_vocab(users)
         prd_vocab = build_vocab(products)
         ctgy_vocab = build_vocab(category)
@@ -232,17 +241,17 @@ def load_attr_vocab(dataset, users, products, category):
 def load_keywords(dataset, keyword_set, keyword_counter):
    
     try:
-        keyword_list = load_vocab(DATASET_PATH_MAP[dataset], field='keywordList')
+        keyword_list = load_keyword_list(DATASET_PATH_MAP[dataset], field='keywordList')
         keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordVocab')
     except Exception as e:
         print(f"Error in load_attr_keyword: {e}")
         keyword_list = list(keyword_set)
         keyword_vocab = build_vocab(keyword_counter)
-        save_vectors(DATASET_PATH_MAP[dataset], keyword_list, field='keywordList')
+        save_keyword_list(DATASET_PATH_MAP[dataset], keyword_list, field='keywordList')
         save_vectors(DATASET_PATH_MAP[dataset], keyword_vocab, field='keywordVocab')
-        keyword_list = load_vocab(DATASET_PATH_MAP[dataset], field='keywordList')
+        keyword_list = load_keyword_list(DATASET_PATH_MAP[dataset], field='keywordList')
         keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordVocab')
-    return keyword_list, 
+    return keyword_list, keyword_stoi
 
 
 def load_document4baseline(config, tokenizer):
@@ -289,8 +298,8 @@ def load_document4baseline(config, tokenizer):
     config.num_prds = len(prd_stoi)
     config.num_ctgy = len(ctgy_stoi)
     
-    keyword = processor.get_keywords()
-    keyword_counter = processor.get_keyword_counter()
+    keyword, keyword_counter = processor.get_keywords_and_counter()
+   
     keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
     config.num_kws = len(keyword_stoi)
 
@@ -325,9 +334,8 @@ def load_document4baseline_from_local(config):
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
         
-        keyword = processor.get_keywords()
-        keyword_counter = processor.get_keyword_counter()
-        keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+        keywordList = load_keyword_list(DATASET_PATH_MAP[config.dataset])
+        keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='usr')
         config.num_kws = len(keyword_stoi)
         
         config.TRAIN.num_train_optimization_steps = int(
@@ -363,10 +371,8 @@ def load_document4baseline_from_local(config):
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
         
-        keyword = processor.get_keywords()
-        keyword_counter = processor.get_keyword_counter()
-        keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
-        config.num_kws = len(keyword_stoi)
+        keywordList = load_keyword_list(DATASET_PATH_MAP[config.dataset])
+        keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='usr')
         
         config.TRAIN.num_train_optimization_steps = int(
             len(
@@ -378,71 +384,78 @@ def load_document4baseline_from_local(config):
 def save_datasets(config):
     
     try:
-      from transformers import BertTokenizer
-      pretrained_weights = 'bert-base-uncased'
-      tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
-      processor = DATASET_MAP[config.dataset]()
-      train_examples, dev_examples, test_examples = processor.get_documents()
-      
-      train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], []
-      dev_texts, dev_labels, dev_users, dev_products, dev_category = [], [], [], [], []
-      test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], []
+        from transformers import BertTokenizer
+        pretrained_weights = 'bert-base-uncased'
+        tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
+        processor = DATASET_MAP[config.dataset]()
+        train_examples, dev_examples, test_examples = processor.get_documents()
+        
+        train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], []
+        dev_texts, dev_labels, dev_users, dev_products, dev_category = [], [], [], [], []
+        test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], []
 
-      users, products, category = processor.get_attributes()
-      usr_stoi, prd_stoi, ctgy_stoi = load_attr_vocab(config.dataset, users, products, category)
-      config.num_labels = processor.NUM_CLASSES
-      config.num_usrs = len(usr_stoi)
-      config.num_prds = len(prd_stoi)
-      config.num_ctgy = len(ctgy_stoi)
-      print("==loading train maa_datasets")
-      for step, example in enumerate(train_examples):
-          train_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
-          train_labels.append(example.label)
-          train_users.append(example.user)
-          train_products.append(example.product)
-          train_category.append(example.category)
-          print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(train_examples),
-                                                            step / len(train_examples) * 100),
-                end="")
-      print("\rDone!".ljust(60))
-      print("==loading dev maa_datasets")
-      for step, example in enumerate(dev_examples):
-          dev_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
-          dev_labels.append(example.label)
-          dev_users.append(example.user)
-          dev_products.append(example.product)
-          dev_category.append(example.category)
-          print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(dev_examples),
-                                                            step / len(dev_examples) * 100),
-                end="")
-      print("\rDone!".ljust(60))
-      print("==loading test maa_datasets")
-      for step, example in enumerate(test_examples):
-          test_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
-          test_labels.append(example.label)
-          test_users.append(example.user)
-          test_products.append(example.product)
-          test_category.append(example.category)
-          print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(test_examples),
-                                                            step / len(test_examples) * 100),
-                end="")
-      print("\rDone!".ljust(60))
+        users, products, category = processor.get_attributes()
+        usr_stoi, prd_stoi, ctgy_stoi = load_attr_vocab(config.dataset, users, products, category)
+        config.num_labels = processor.NUM_CLASSES
+        config.num_usrs = len(usr_stoi)
+        config.num_prds = len(prd_stoi)
+        config.num_ctgy = len(ctgy_stoi)
 
-      
-      train_data = train_texts, train_labels, train_users, train_products, train_category
-      dev_data = dev_texts, dev_labels, dev_users, dev_products, dev_category
-      test_data = test_texts, test_labels, test_users, test_products, test_category
-      torch.save(train_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'train_{}.pt'.format(config.BASE.strategy)))
-      torch.save(dev_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'dev_{}.pt'.format(config.BASE.strategy)))
-      torch.save(test_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'test_{}.pt'.format(config.BASE.strategy)))
+        keyword, keyword_counter = processor.get_keywords_and_counter()
+        
+        keywordList, keyword_stoi = load_keywords(config.dataset, keyword, keyword_counter)
+        config.num_kws = len(keyword_stoi)
 
-      
+        
+        print("==loading train maa_datasets")
+        for step, example in enumerate(train_examples):
+            train_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
+            train_labels.append(example.label)
+            train_users.append(example.user)
+            train_products.append(example.product)
+            train_category.append(example.category)
+            print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(train_examples),
+                                                                step / len(train_examples) * 100),
+                    end="")
+        print("\rDone!".ljust(60))
+        print("==loading dev maa_datasets")
+        for step, example in enumerate(dev_examples):
+            dev_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
+            dev_labels.append(example.label)
+            dev_users.append(example.user)
+            dev_products.append(example.product)
+            dev_category.append(example.category)
+            print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(dev_examples),
+                                                                step / len(dev_examples) * 100),
+                    end="")
+        print("\rDone!".ljust(60))
+        print("==loading test maa_datasets")
+        for step, example in enumerate(test_examples):
+            test_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
+            test_labels.append(example.label)
+            test_users.append(example.user)
+            test_products.append(example.product)
+            test_category.append(example.category)
+            print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(test_examples),
+                                                                step / len(test_examples) * 100),
+                    end="")
+        print("\rDone!".ljust(60))
+
+        
+        train_data = train_texts, train_labels, train_users, train_products, train_category
+        dev_data = dev_texts, dev_labels, dev_users, dev_products, dev_category
+        test_data = test_texts, test_labels, test_users, test_products, test_category
+        torch.save(train_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'train_{}.pt'.format(config.BASE.strategy)))
+        torch.save(dev_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'dev_{}.pt'.format(config.BASE.strategy)))
+        torch.save(test_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'test_{}.pt'.format(config.BASE.strategy)))
+
+        
     except Exception as e:
-      print(f"Error in save_datasets: {e}")
-      print("Full traceback:")
-      import traceback
-      traceback.print_exc()  # This will print the full stack trace
-      raise
+        print(f"Error in save_datasets: {e}")
+        print("Full traceback:")
+        import traceback
+        traceback.print_exc()  # This will print the full stack trace
+        raise
 
 def default_collate(batch):
     r"""Puts each data field into a tensor with outer dimension batch size"""

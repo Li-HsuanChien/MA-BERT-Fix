@@ -155,19 +155,19 @@ class MAATrainer(object):
             torch.cuda.empty_cache()
             if resume_batch:
                 start_time = time.time()
-            input_ids, label, usr, prd, ctgy, kw, kwcount = batch
+            input_ids, label, usr, prd, ctgy = batch
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
             ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
-            
+            kw = self.keyword_list
+            #kwcount = torch.Tensor([self.keyword_counter[x] for x in ctgy]).long().to(self.config.device)
             try:
-                kwids = self.tokenizer(kw, return_tensors="pt", padding=True, truncation=True)
                 logits = self.net(input_ids=input_ids,
                                     attrs=(usr, prd, ctgy),
-                                    keywords=kwids,
+                                    keywordList=kw,
                                     attention_mask=attention_mask)[0]
                 
 

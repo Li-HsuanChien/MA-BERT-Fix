@@ -84,7 +84,7 @@ class MAAModel(BertPreTrainedModel):
             self,
             input_ids=None,
             attrs=None,
-            keywordstokens=None,
+            keywordList=None,
             attention_mask=None,
             token_type_ids=None,
             position_ids=None,
@@ -92,11 +92,8 @@ class MAAModel(BertPreTrainedModel):
             inputs_embeds=None,
     ):
         
-        kw = self.bert(**keywordstokens)
+        keyword_embeddings = self.get_word_embeddings(keywordList)
         
-        kw_hidden_state = kw.last_hidden_state
-        
-        keyword_embeddings = kw_hidden_state
         print(keyword_embeddings)
         exit() 
         outputs = self.bert(
@@ -291,3 +288,37 @@ class MAAModel(BertPreTrainedModel):
           print(f"\nInf detected in {name}")
       else:
           print(f"\n{name} output is valid with mean: {tensor.mean().item()}")
+          
+    def get_word_embeddings(self, words):
+        from transformers import BertTokenizerFast
+        pretrained_weights = 'bert-base-uncased'
+        tokenizer = BertTokenizerFast.from_pretrained(pretrained_weights)  
+
+
+        # Tokenize words
+        inputs = tokenizer(words, return_tensors='pt', padding=True, truncation=True, is_split_into_words=True)
+
+        # Move input to the same device as the model
+        
+        model = BertModel.from_pretrained('bert-base-uncased')
+
+        # Get BERT embeddings
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        # Extract last hidden states
+        embeddings = outputs.last_hidden_state  # Shape: [batch_size, seq_len, hidden_size]
+
+        # Get word IDs (maps tokens to words)
+        word_ids = inputs.word_ids(0)  # List of length seq_len
+
+        # Extract embeddings only for word-level tokens (ignoring subwords)
+        word_embeddings = []
+        seen_words = set()
+
+        for i, word_idx in enumerate(word_ids):
+            if word_idx is not None and word_idx not in seen_words:
+                word_embeddings.append(embeddings[0, i, :])  # Select first batch, i-th token
+                seen_words.add(word_idx)  # Ensure we only pick the first subword
+
+        return torch.stack(word_embeddings)

@@ -7,8 +7,15 @@ import pandas as pd
 import torch.utils.data
 from collections import Counter
 from keybert import KeyBERT
+from typing import Dict, Iterable, List, Optional
+from collections import Counter, OrderedDict
+import torch.nn as nn
+from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 
 csv.field_size_limit(1000000)
+
+local_model = SentenceTransformer("./local_model")  # Load the saved model
 
 
 class InputExample(object):
@@ -130,44 +137,67 @@ class SentenceProcessor(object):
               category[document[ATTR_MAP["category"]]] += 1
       return tuple([users, products, category]) 
     
-    def _get_keywords(self, *datasets):
+    def _get_keywords_and_counter(self, *datasets):
         keywords = set()
-        # userspecificKws = []
+        keyword_counter = Counter()
+        
         ATTR_MAP = {
-          #'user': 0,  # assuming indices are integers and not strings
-          'text': 3,
+            'text': 2,
         }
+        
         for dataset in datasets:
-            for document in dataset:
-                # user = document[ATTR_MAP["user"]]
+            for document in tqdm(dataset, desc="Processing documents for keywords", unit="doc"):
                 doc = document[ATTR_MAP["text"]]
-                kw_model = KeyBERT()
-                keywordList = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
-                rawKeywordList = [item[0] for item in keywordList]
-                for kw in rawKeywordList:
-                    keywords.add(kw)
-                    # userspecificKws.append({kw: user})
-        return keywords #[keywords,...]
+                if doc and not pd.isna(doc): 
+                    kw_model = KeyBERT(local_model)
+                    keyword_list = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
+                    raw_keyword_list = [item[0] for item in keyword_list]
+                    
+                    for kw in raw_keyword_list:
+                        keywords.add(kw)
+                        keyword_counter[kw] += 1
+        
+        return keywords, keyword_counter
+
+    # def _get_keywords(self, *datasets):
+    #     keywords = set()
+        
+    #     # userspecificKws = []
+    #     ATTR_MAP = {
+    #       #'user': 0,  # assuming indices are integers and not strings
+    #       'text': 2,
+    #     }
+    #     for dataset in datasets:
+    #         for document in dataset:
+    #             # user = document[ATTR_MAP["user"]]
+    #             doc = document[ATTR_MAP["text"]]
+    #             kw_model = KeyBERT(local_model)
+    #             keywordList = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
+    #             rawKeywordList = [item[0] for item in keywordList]
+    #             for kw in rawKeywordList:
+    #                 keywords.add(kw)
+    #                 # userspecificKws.append({kw: user})
+    #     return keywords #[keywords,...]
     
-    def _get_keyword_counter(self, *datasets):
-        keywordCounter = Counter()
-        # userspecificKws = []
-        ATTR_MAP = {
-        # 'user': 0,  # assuming indices are integers and not strings
-          'text': 3,
-        }
-        for dataset in datasets:
-            for document in dataset:
-                # user = document[ATTR_MAP["user"]]
-                doc = document[ATTR_MAP["text"]]
-                kw_model = KeyBERT()
-                keywordList = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
-                rawKeywordList = [item[0] for item in keywordList]
-                for kw in rawKeywordList:
-                    keywordCounter[kw] += 1
-                    # userspecificKws.append({kw: user})
-        #first list is for BERT processing, second is for attribute or mapped embedding processing
-        return keywordCounter             
+    # def _get_keyword_counter(self, *datasets):
+    #     keywordCounter = Counter()
+    #     # userspecificKws = []
+    #     ATTR_MAP = {
+    #     # 'user': 0,  # assuming indices are integers and not strings
+    #       'text': 2,
+    #     }
+    #     for dataset in datasets:
+    #         for document in dataset:
+    #             # user = document[ATTR_MAP["user"]]
+    #             doc = document[ATTR_MAP["text"]]
+    #             kw_model = KeyBERT(local_model)
+    #             keywordList = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
+    #             rawKeywordList = [item[0] for item in keywordList]
+    #             for kw in rawKeywordList:
+    #                 keywordCounter[kw] += 1
+    #                 # userspecificKws.append({kw: user})
+    #     #first list is for BERT processing, second is for attribute or mapped embedding processing
+    #     return keywordCounter             
         
 
 
@@ -217,7 +247,7 @@ def clean_document(document):
     return string.lower().strip()
 
 def build_vocab(counter):
-    from torchtext.vocab import build_vocab_from_iterator
+
     
     try:
         if not counter:
@@ -227,11 +257,11 @@ def build_vocab(counter):
         iterator = ([str(key) if key is not None and key == key else "<unk>" for key in counter.keys()])
         # Pass iterator to build_vocab_from_iterator
         vocab = build_vocab_from_iterator([iterator], specials=["<unk>"])
-        vocab.set_default_index(vocab["<unk>"])
        
         return vocab
     except Exception as e:
         print(f"Error in build_vocab: {e}")
+        print(f"counter: {counter}")
         return None
 
 
@@ -273,3 +303,56 @@ def _truncate_and_pad(tokens, max_length=510, pad_strategy="head"):
         return
     else:
         return ['[CLS]'] + tokens + ['[SEP]'] + ['<PAD>'] * (max_length-total_length)
+
+class Vocab(nn.Module):
+    def __init__(self, tokens):
+        super(Vocab, self).__init__()
+        self.itos = list(tokens)  # Index-to-string mapping
+        self.stoi = {tok: i for i, tok in enumerate(self.itos)}  # String-to-index mapping
+
+    def __getitem__(self, token):
+        """Allows `vocab[token]` access like a dictionary."""
+        return self.stoi.get(token, self.stoi["<unk>"])  # Return index, default to "<unk>"
+
+    def get_itos(self):
+        """Returns the index-to-string mapping."""
+        return self.itos
+
+    def get_stoi(self):
+        """Returns the index-to-string mapping."""
+        return self.stoi
+
+    def __len__(self):
+        return len(self.itos)
+
+
+def build_vocab_from_iterator(iterator: Iterable, min_freq: int = 1, specials: Optional[list] = None, special_first: bool = True):
+    """
+    Constructs a `Vocab` object from an iterator.
+
+    Args:
+        iterator (Iterable): An iterator that yields lists of tokens (e.g., sentences or documents).
+        min_freq (int): Minimum frequency for a token to be included in the vocabulary.
+        specials (list): List of special tokens (e.g., ["<unk>", "<pad>"]).
+        special_first (bool): Whether to place special tokens at the start of the vocabulary.
+
+    Returns:
+        Vocab: A vocabulary object.
+    """
+    counter = Counter()
+    
+    # Count token frequencies
+    for tokens in iterator:
+        counter.update(tokens)
+    
+    # Add special tokens
+    if specials is None:
+        specials = []
+    if special_first:
+        sorted_tokens = specials + [token for token, freq in counter.items() if freq >= min_freq]
+    else:
+        sorted_tokens = [token for token, freq in counter.items() if freq >= min_freq] + specials
+
+    # Create vocabulary
+    return Vocab(OrderedDict((tok, 1) for tok in sorted_tokens))
+
