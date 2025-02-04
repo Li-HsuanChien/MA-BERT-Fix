@@ -84,7 +84,8 @@ class MAAModel(BertPreTrainedModel):
             self,
             input_ids=None,
             attrs=None,
-            keywordList=None,
+            pooledkeywordList=None,
+            keywordlist=None,
             attention_mask=None,
             token_type_ids=None,
             position_ids=None,
@@ -92,10 +93,10 @@ class MAAModel(BertPreTrainedModel):
             inputs_embeds=None,
     ):
         
-        keyword_embeddings = self.get_word_embeddings(keywordList)
+        keyword_embeddings = self.get_word_embeddings(keywordlist)
         
-        # print(keyword_embeddings)
-        # exit() 
+        print(keyword_embeddings)
+        exit() 
         
         outputs = self.bert(
             input_ids,
