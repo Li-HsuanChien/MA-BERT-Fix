@@ -112,155 +112,74 @@ class MAAModel(BertPreTrainedModel):
 
         usrs, prds, ctgys = attrs # (bs, ) * 3
         
-            
         if(self.cus_config.attributes == 'usr_ctgy'):
             usr = self.usr_embed(usrs) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
-            if self.type == 'b':
-                hidden_state = self.dropout(last_output)
-                outputs = self.classifier(hidden_state, [usr, ctgy])
-            elif self.type == 'a':
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-                if 12 > self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                hidden_state = self.fusion(last_output, [usr, ctgy])
-                hidden_state = self.dropout(hidden_state)
-                for i, l in enumerate(self.layer):
-                    hidden_state = l(hidden_state, extend_attention_mask)[0]
-                hidden_state = self.dropout(hidden_state)
-                outputs = self.classifier(hidden_state)
-            else:
-                
-                t_self = self.text.expand_as(usr)  # (bs, attr_dim)
-            
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-            
-                if 12 >= self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                    
-                    hidden_state = self.dropout(last_output)
-                    
-                    for i, mmalayer in enumerate(self.ATrans_decoder):
-                        hidden_state = mmalayer([usr, ctgy, t_self], hidden_state, extend_attention_mask)
-                    
-                    hidden_state = self.dropout(hidden_state)
-                    
-                    outputs = self.classifier(hidden_state)
-                
-
-            return (outputs, hidden_state)  # logits, last_hidden_stat
-            
         elif(self.cus_config.attributes == 'prd_ctgy'):
-            
-            prd = self.prd_embed(prds) # (bs, attr_dim)
+            prd = self.usr_embed(prds) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
-            
-            if self.type == 'b':
-                hidden_state = self.dropout(last_output)
-                outputs = self.classifier(hidden_state, [prd, ctgy])
-            elif self.type == 'a':
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-                if 12 > self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                hidden_state = self.fusion(last_output, [prd, ctgy])
-                hidden_state = self.dropout(hidden_state)
-                for i, l in enumerate(self.layer):
-                    hidden_state = l(hidden_state, extend_attention_mask)[0]
-                hidden_state = self.dropout(hidden_state)
-                outputs = self.classifier(hidden_state)
-            else:
-                
-                t_self = self.text.expand_as(prd)  # (bs, attr_dim)
-            
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-            
-                if 12 >= self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                    
-                    hidden_state = self.dropout(last_output)
-                    
-                    for i, mmalayer in enumerate(self.ATrans_decoder):
-                        hidden_state = mmalayer([prd, ctgy, t_self], hidden_state, extend_attention_mask)
-                    
-                    hidden_state = self.dropout(hidden_state)
-                    
-                    outputs = self.classifier(hidden_state)
-                
-
-            return (outputs, hidden_state)  # logits, last_hidden_stat
         elif(self.cus_config.attributes == 'usr_prd_ctgy'):
             usr = self.usr_embed(usrs) # (bs, attr_dim)
-            prd = self.prd_embed(prds) # (bs, attr_dim)
+            prd = self.usr_embed(prds) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
-            if self.type == 'b':
-                hidden_state = self.dropout(last_output)
-                outputs = self.classifier(hidden_state, [usr, prd, ctgy])
-            elif self.type == 'a':
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-                if 12 > self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                hidden_state = self.fusion(last_output, [usr, prd, ctgy])
-                hidden_state = self.dropout(hidden_state)
-                for i, l in enumerate(self.layer):
-                    hidden_state = l(hidden_state, extend_attention_mask)[0]
-                hidden_state = self.dropout(hidden_state)
-                outputs = self.classifier(hidden_state)
-            else:
-                
-                t_self = self.text.expand_as(usr)  # (bs, attr_dim)
-            
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-            
-                if 12 >= self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                    
-                    hidden_state = self.dropout(last_output)
-                    
-                    for i, mmalayer in enumerate(self.ATrans_decoder):
-                        hidden_state = mmalayer([usr, prd, ctgy, t_self], hidden_state, extend_attention_mask)
-                    
-                    hidden_state = self.dropout(hidden_state)
-                    
-                    outputs = self.classifier(hidden_state)
-                
-
-            return (outputs, hidden_state)  # logits, last_hidden_stat
         else:
             usr = self.usr_embed(usrs) # (bs, attr_dim)
-            prd = self.prd_embed(prds) # (bs, attr_dim)
-            if self.type == 'b':
-                hidden_state = self.dropout(last_output)
+            ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
+                
+        if self.type == 'b':
+            hidden_state = self.dropout(last_output)
+            if(self.cus_config.attributes == 'usr_ctgy'):
+                outputs = self.classifier(hidden_state, [usr, ctgy])
+            elif(self.cus_config.attributes == 'prd_ctgy'):
+                outputs = self.classifier(hidden_state, [prd, ctgy]) 
+            elif(self.cus_config.attributes == 'usr_prd_ctgy'):
+                outputs = self.classifier(hidden_state, [usr, prd, ctgy])
+            else:
                 outputs = self.classifier(hidden_state, [usr, prd])
-            elif self.type == 'a':
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-                if 12 > self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+        elif self.type == 'a':
+            extend_attention_mask = self.get_attention_mask(attention_mask)
+            if 12 > self.cus_config.n_bertlayer > 0:
+                last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+            if(self.cus_config.attributes == 'usr_ctgy'):
+                hidden_state = self.fusion(last_output, [usr, ctgy])
+            elif(self.cus_config.attributes == 'prd_ctgy'):
+                hidden_state = self.fusion(last_output, [prd, ctgy])
+            elif(self.cus_config.attributes == 'usr_prd_ctgy'):
+                hidden_state = self.fusion(last_output, [usr, prd, ctgy])
+            else:
                 hidden_state = self.fusion(last_output, [usr, prd])
-                hidden_state = self.dropout(hidden_state)
-                for i, l in enumerate(self.layer):
-                    hidden_state = l(hidden_state, extend_attention_mask)[0]
+            hidden_state = self.dropout(hidden_state)
+            for i, l in enumerate(self.layer):
+                hidden_state = l(hidden_state, extend_attention_mask)[0]
+            hidden_state = self.dropout(hidden_state)
+            outputs = self.classifier(hidden_state)
+        else:
+            
+            t_self = self.text.expand_as(usr)  # (bs, attr_dim)
+        
+            extend_attention_mask = self.get_attention_mask(attention_mask)
+        
+            if 12 >= self.cus_config.n_bertlayer > 0:
+                last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+                
+                hidden_state = self.dropout(last_output)
+                if(self.cus_config.attributes == 'usr_ctgy'):
+                    for i, mmalayer in enumerate(self.ATrans_decoder):
+                        hidden_state = mmalayer([usr, ctgy, t_self], hidden_state, extend_attention_mask)
+                elif(self.cus_config.attributes == 'prd_ctgy'):
+                    for i, mmalayer in enumerate(self.ATrans_decoder):
+                        hidden_state = mmalayer([prd, ctgy, t_self], hidden_state, extend_attention_mask)
+                elif(self.cus_config.attributes == 'usr_prd_ctgy'):
+                    for i, mmalayer in enumerate(self.ATrans_decoder):
+                        hidden_state = mmalayer([usr, prd, ctgy, t_self], hidden_state, extend_attention_mask)
+                else:
+                    for i, mmalayer in enumerate(self.ATrans_decoder):
+                        hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)                
                 hidden_state = self.dropout(hidden_state)
                 outputs = self.classifier(hidden_state)
-            else:
-                
-                t_self = self.text.expand_as(usr)  # (bs, attr_dim)
             
-                extend_attention_mask = self.get_attention_mask(attention_mask)
-            
-                if 12 >= self.cus_config.n_bertlayer > 0:
-                    last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                    
-                    hidden_state = self.dropout(last_output)
-                    
-                    for i, mmalayer in enumerate(self.ATrans_decoder):
-                        hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)
-                    
-                    hidden_state = self.dropout(hidden_state)
-                    
-                    outputs = self.classifier(hidden_state)
-                
 
-            return (outputs, hidden_state)  # logits, last_hidden_stat
+        return (outputs, hidden_state)
             
         
         
