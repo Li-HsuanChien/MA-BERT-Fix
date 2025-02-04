@@ -19,13 +19,14 @@ local_model = SentenceTransformer("./local_model")  # Load the saved model
 
 
 class InputExample(object):
-    def __init__(self, guid=None, text=None, user=None, product=None, label=None, category=None):
+    def __init__(self, guid=None, text=None, user=None, product=None, label=None, category=None, keywordlist=None):
         self.guid = guid
         self.text = text
         self.label = label
         self.user = user
         self.product = product
         self.category = category
+        self.keywordlist = keywordlist
 
 
 class Data(torch.utils.data.Dataset):
@@ -59,7 +60,8 @@ class SentenceProcessor(object):
               text = clean_document(line[2])
               # text = line[2]
               examples.append(
-                  InputExample(guid=guid, user=line[0], product=line[1], text=text, label=int(line[3]) - 1, category=line[4]))
+                  InputExample(guid=guid, user=line[0], product=line[1], text=text, label=int(line[3]) - 1, \
+                      category=line[4], keywordlist=line[5]))
           return examples
         except Exception as e:
           print(f"Create example error:{e}")
@@ -70,13 +72,18 @@ class SentenceProcessor(object):
         documents = []
 
         # Iterate over the rows
-        for i in range(len(pd_reader[0])):
+        for i in tqdm(range(len(pd_reader[0])), desc="Reading files and processing keywords", unit="doc"):
             try:
                 # Check if the review (third column) exists and is not empty
                 review = pd_reader[3][i]  # Assuming the review is in the third column (index 3)
                 if review not in [None, ""]:
-                    # [user, product, review, label, category] 
-                    document = [pd_reader[0][i], pd_reader[1][i], review, pd_reader[2][i], pd_reader[4][i]]
+                    #get keywords
+                    kw_model = KeyBERT(local_model)
+                    keyword_list = kw_model.extract_keywords(review, keyphrase_ngram_range=(1, 1), stop_words=None)
+                    raw_keyword_list = [item[0] for item in keyword_list]
+                        
+                    # [user, product, review, label, category, [keyword]] 
+                    document = [pd_reader[0][i], pd_reader[1][i], review, pd_reader[2][i], pd_reader[4][i], raw_keyword_list]
                     documents.append(document)
             except KeyError:
                 # In case the column doesn't exist, skip the row
@@ -95,7 +102,8 @@ class SentenceProcessor(object):
                 review = document[2]
                 label = int(document[3]) - 1
                 category = document[4]
-                sentences.extend([InputExample(user=user, product=product, text=sentence, label=label, category=category) for
+                keywordlist = document[5]
+                sentences.extend([InputExample(user=user, product=product, text=sentence, label=label, category=category, keywordlist=keywordlist) for
                                   sentence in generate_sents(clean_document(review))])
                 # for s in generate_sents(clean_document(review)):
                 #     f = open("temp.txt", 'a')
@@ -113,7 +121,8 @@ class SentenceProcessor(object):
                 review = document[2]
                 label = int(document[3]) - 1
                 category = document[4]
-                documents.append(InputExample(user=user, product=product, text=generate_sents(clean_document(review)), label=label, category=category))
+                keywordlist = document[5]
+                documents.append(InputExample(user=user, product=product, text=generate_sents(clean_document(review)), label=label, category=category, keywordlist=keywordlist))
                 print(generate_sents(clean_document(review)))
                 print(len(generate_sents(clean_document(review))))
                 time.sleep(10)
@@ -138,26 +147,20 @@ class SentenceProcessor(object):
       return tuple([users, products, category]) 
     
     def _get_keywords_and_counter(self, *datasets):
-        keywords = set()
+        keywordset = set()
         keyword_counter = Counter()
         
         ATTR_MAP = {
-            'text': 2,
+            'keywordlist': 5,
         }
         
         for dataset in datasets:
-            for document in tqdm(dataset, desc="Processing documents for keywords", unit="doc"):
-                doc = document[ATTR_MAP["text"]]
-                if doc and not pd.isna(doc): 
-                    kw_model = KeyBERT(local_model)
-                    keyword_list = kw_model.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words=None)
-                    raw_keyword_list = [item[0] for item in keyword_list]
-                    
-                    for kw in raw_keyword_list:
-                        keywords.add(kw)
-                        keyword_counter[kw] += 1
-        
-        return keywords, keyword_counter
+            for document in dataset:
+                for keyword in document[ATTR_MAP["keywordlist"]]:
+                    keyword_counter[keyword] += 1
+                    keywordset.add(keyword)
+                
+        return keywordset, keyword_counter
 
     # def _get_keywords(self, *datasets):
     #     keywords = set()

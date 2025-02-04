@@ -38,32 +38,35 @@ def load_bert_sentences(config):
 
     train_examples, dev_examples, test_examples = processor.get_sentences()
 
-    train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], []
-    dev_texts, dev_labels, dev_users, dev_products, dev_category = [], [], [], [], []
-    test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], []
-
+    train_texts, train_labels, train_users, train_products, train_category, train_keywords = [], [], [], [], [], []
+    dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords =  [], [], [], [], [], []
+    test_texts, test_labels, test_users, test_products, test_category, test_keywords =  [], [], [], [], [], []
+    
     for example in train_examples:
         train_texts.append(example.text)
         train_labels.append(example.label)
         train_users.append(example.user)
         train_products.append(example.product)
         train_category.append(example.category)
+        train_keywords.append(example.keywordlist)
     for example in dev_examples:
         dev_texts.append(example.text)
         dev_labels.append(example.label)
         dev_users.append(example.user)
         dev_products.append(example.product)
         dev_category.append(example.category)
+        dev_keywords.append(example.keywordlist)
     for example in test_examples:
         test_texts.append(example.text)
         test_labels.append(example.label)
         test_users.append(example.user)
         test_products.append(example.product)
         test_category.append(example.category)
+        test_keywords.append(example.keywordlist)
         
-    train_dataset = Data(train_texts, train_labels, train_users, train_products, train_category)
-    dev_dataset = Data(dev_texts, dev_labels, dev_users, dev_products, dev_category)
-    test_dataset = Data(test_texts, test_labels, test_users, test_products, test_category)
+    train_dataset = Data(train_texts, train_labels, train_users, train_products, train_category, train_keywords)
+    dev_dataset = Data(dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords)
+    test_dataset = Data(test_texts, test_labels, test_users, test_products, test_category, test_keywords)
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.TRAIN.batch_size, shuffle=True)
     dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
@@ -95,9 +98,9 @@ def load_bert_documents(config):
 
     train_examples, dev_examples, test_examples = processor.get_documents()
 
-    train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], [], []
-    dev_texts, dev_labels, dev_users, dev_products, dev_category  = [], [], [], [], [], []
-    test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], [], []
+    train_texts, train_labels, train_users, train_products, train_category, train_keywords = [], [], [], [], [], []
+    dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords =  [], [], [], [], [], []
+    test_texts, test_labels, test_users, test_products, test_category, test_keywords =  [], [], [], [], [], []
 
     for example in train_examples:
         train_texts.append(example.text)
@@ -105,26 +108,29 @@ def load_bert_documents(config):
         train_users.append(example.user)
         train_products.append(example.product)
         train_category.append(example.category)
+        train_keywords.append(example.keywordlist)
     for example in dev_examples:
         dev_texts.append(example.text)
         dev_labels.append(example.label)
         dev_users.append(example.user)
         dev_products.append(example.product)
         dev_category.append(example.category)
+        dev_keywords.append(example.keywordlist)
     for example in test_examples:
         test_texts.append(example.text)
         test_labels.append(example.label)
         test_users.append(example.user)
         test_products.append(example.product)
         test_category.append(example.category)
+        test_keywords.append(example.keywordlist)
 
     # train_texts, train_labels = [example.text for example in train_examples], [example.label for example in train_examples]
     # dev_texts, dev_labels = [example.text for example in dev_examples], [example.label for example in dev_examples]
     # test_texts, test_labels = [example.text for example in test_examples], [example.label for example in test_examples]
 
-    train_dataset = Data(train_texts, train_labels, train_users, train_products, train_category)
-    dev_dataset = Data(dev_texts, dev_labels, dev_users, dev_products, dev_category)
-    test_dataset = Data(test_texts, test_labels, test_users, test_products, test_category)
+    train_dataset = Data(train_texts, train_labels, train_users, train_products, train_category, train_keywords)
+    dev_dataset = Data(dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords)
+    test_dataset = Data(test_texts, test_labels, test_users, test_products, test_category, test_keywords)
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.TRAIN.batch_size, shuffle=True)
     dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
@@ -260,9 +266,9 @@ def load_document4baseline(config, tokenizer):
 
     train_examples, dev_examples, test_examples = processor.get_documents()
 
-    train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], []
-    dev_texts, dev_labels, dev_users, dev_products, dev_category = [], [], [], [], []
-    test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], []
+    train_texts, train_labels, train_users, train_products, train_category, train_keywords = [], [], [], [], [], []
+    dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords =  [], [], [], [], [], []
+    test_texts, test_labels, test_users, test_products, test_category, test_keywords =  [], [], [], [], [], []
 
     for example in train_examples:
         train_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
@@ -270,22 +276,27 @@ def load_document4baseline(config, tokenizer):
         train_users.append(example.user)
         train_products.append(example.product)
         train_category.append(example.category)
+        train_keywords.append(example.keywordlist)
     for example in dev_examples:
         dev_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
         dev_labels.append(example.label)
         dev_users.append(example.user)
         dev_products.append(example.product)
         dev_category.append(example.category)
+        dev_keywords.append(example.keywordlist)
+        
     for example in test_examples:
         test_texts.append(processor4baseline_over_one_example(example.text, tokenizer, config))
         test_labels.append(example.label)
         test_users.append(example.user)
         test_products.append(example.product)
         test_category.append(example.category)
+        test_keywords.append(example.keywordlist)
+        
 
-    train_dataset = Data(train_texts, train_labels, train_users, train_products, train_category)
-    dev_dataset = Data(dev_texts, dev_labels, dev_users, dev_products, dev_category)
-    test_dataset = Data(test_texts, test_labels, test_users, test_products, test_category)
+    train_dataset = Data(train_texts, train_labels, train_users, train_products, train_category, train_keywords)
+    dev_dataset = Data(dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords)
+    test_dataset = Data(test_texts, test_labels, test_users, test_products, test_category, test_keywords)
     
     train_dataloader = DataLoader(train_dataset, batch_size=config.TRAIN.batch_size, shuffle=True)
     dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
@@ -308,19 +319,19 @@ def load_document4baseline(config, tokenizer):
 
 def load_document4baseline_from_local(config):
     try:
-        train_input_ids, train_labels, train_users, train_products, train_category = load_baselines_datasets(
+        train_input_ids, train_labels, train_users, train_products, train_category, train_keywords = load_baselines_datasets(
             DATASET_PATH_MAP[config.dataset], field='train', strategy=config.BASE.strategy)
-        dev_input_ids, dev_labels, dev_users, dev_products, dev_category = load_baselines_datasets(
+        dev_input_ids, dev_labels, dev_users, dev_products, dev_category, dev_keywords = load_baselines_datasets(
             DATASET_PATH_MAP[config.dataset], field='dev', strategy=config.BASE.strategy)
-        test_input_ids, test_labels, test_users, test_products, test_category = load_baselines_datasets(
+        test_input_ids, test_labels, test_users, test_products, test_category, test_keywords = load_baselines_datasets(
             DATASET_PATH_MAP[config.dataset], field='test', strategy=config.BASE.strategy)
 
         processor = DATASET_MAP[config.dataset]()
         config.num_labels = processor.NUM_CLASSES
         
-        train_dataset = Data(train_input_ids, train_labels, train_users, train_products, train_category)
-        dev_dataset = Data(dev_input_ids, dev_labels, dev_users, dev_products, dev_category)
-        test_dataset = Data(test_input_ids, test_labels, test_users, test_products, test_category)
+        train_dataset = Data(train_input_ids, train_labels, train_users, train_products, train_category, train_keywords)
+        dev_dataset = Data(dev_input_ids, dev_labels, dev_users, dev_products, dev_category, dev_keywords)
+        test_dataset = Data(test_input_ids, test_labels, test_users, test_products, test_category, test_keywords)
         
         train_dataloader = DataLoader(train_dataset, batch_size=config.TRAIN.batch_size, shuffle=True)
         dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
@@ -346,20 +357,22 @@ def load_document4baseline_from_local(config):
         return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keywordList, keyword_stoi
     except Exception as e:
         print(f"Error in load_document4baseline_from_local: {e}")
+        
         save_datasets(config)
-        train_input_ids, train_labels, train_users, train_products, train_category = load_baselines_datasets(
+        
+        train_input_ids, train_labels, train_users, train_products, train_category, train_keywords = load_baselines_datasets(
             DATASET_PATH_MAP[config.dataset], field='train', strategy=config.BASE.strategy)
-        dev_input_ids, dev_labels, dev_users, dev_products, dev_category = load_baselines_datasets(
+        dev_input_ids, dev_labels, dev_users, dev_products, dev_category, dev_keywords = load_baselines_datasets(
             DATASET_PATH_MAP[config.dataset], field='dev', strategy=config.BASE.strategy)
-        test_input_ids, test_labels, test_users, test_products, test_category = load_baselines_datasets(
+        test_input_ids, test_labels, test_users, test_products, test_category, test_keywords = load_baselines_datasets(
             DATASET_PATH_MAP[config.dataset], field='test', strategy=config.BASE.strategy)
 
         processor = DATASET_MAP[config.dataset]()
         config.num_labels = processor.NUM_CLASSES
 
-        train_dataset = Data(train_input_ids, train_labels, train_users, train_products, train_category)
-        dev_dataset = Data(dev_input_ids, dev_labels, dev_users, dev_products, dev_category)
-        test_dataset = Data(test_input_ids, test_labels, test_users, test_products, test_category)
+        train_dataset = Data(train_input_ids, train_labels, train_users, train_products, train_category, train_keywords)
+        dev_dataset = Data(dev_input_ids, dev_labels, dev_users, dev_products, dev_category, dev_keywords)
+        test_dataset = Data(test_input_ids, test_labels, test_users, test_products, test_category, test_keywords)
         train_dataloader = DataLoader(train_dataset, batch_size=config.TRAIN.batch_size, shuffle=True)
         dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
         test_dataloader = DataLoader(test_dataset, batch_size=config.TEST.batch_size)
@@ -390,9 +403,9 @@ def save_datasets(config):
         processor = DATASET_MAP[config.dataset]()
         train_examples, dev_examples, test_examples = processor.get_documents()
         
-        train_texts, train_labels, train_users, train_products, train_category = [], [], [], [], []
-        dev_texts, dev_labels, dev_users, dev_products, dev_category = [], [], [], [], []
-        test_texts, test_labels, test_users, test_products, test_category = [], [], [], [], []
+        train_texts, train_labels, train_users, train_products, train_category, train_keywords = [], [], [], [], [], []
+        dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords = [], [], [], [], [], []
+        test_texts, test_labels, test_users, test_products, test_category, test_keywords = [], [], [], [], [], []
 
         users, products, category = processor.get_attributes()
         usr_stoi, prd_stoi, ctgy_stoi = load_attr_vocab(config.dataset, users, products, category)
@@ -414,6 +427,7 @@ def save_datasets(config):
             train_users.append(example.user)
             train_products.append(example.product)
             train_category.append(example.category)
+            train_keywords.append(example.keywordlist)
             print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(train_examples),
                                                                 step / len(train_examples) * 100),
                     end="")
@@ -425,6 +439,8 @@ def save_datasets(config):
             dev_users.append(example.user)
             dev_products.append(example.product)
             dev_category.append(example.category)
+            dev_keywords.append(example.keywordlist)
+            
             print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(dev_examples),
                                                                 step / len(dev_examples) * 100),
                     end="")
@@ -436,15 +452,17 @@ def save_datasets(config):
             test_users.append(example.user)
             test_products.append(example.product)
             test_category.append(example.category)
+            test_keywords.append(example.keywordlist)
+            
             print("\rIteration: {:>5}/{:>5} ({:.2f}%)".format(step, len(test_examples),
                                                                 step / len(test_examples) * 100),
                     end="")
         print("\rDone!".ljust(60))
 
         
-        train_data = train_texts, train_labels, train_users, train_products, train_category
-        dev_data = dev_texts, dev_labels, dev_users, dev_products, dev_category
-        test_data = test_texts, test_labels, test_users, test_products, test_category
+        train_data = train_texts, train_labels, train_users, train_products, train_category, train_keywords
+        dev_data = dev_texts, dev_labels, dev_users, dev_products, dev_category, dev_keywords
+        test_data = test_texts, test_labels, test_users, test_products, test_category, test_keywords
         torch.save(train_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'train_{}.pt'.format(config.BASE.strategy)))
         torch.save(dev_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'dev_{}.pt'.format(config.BASE.strategy)))
         torch.save(test_data, os.path.join(DATASET_PATH_MAP[config.dataset], 'test_{}.pt'.format(config.BASE.strategy)))

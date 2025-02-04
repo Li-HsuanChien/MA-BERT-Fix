@@ -94,8 +94,9 @@ class MAAModel(BertPreTrainedModel):
         
         keyword_embeddings = self.get_word_embeddings(keywordList)
         
-        print(keyword_embeddings)
-        exit() 
+        # print(keyword_embeddings)
+        # exit() 
+        
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -106,6 +107,7 @@ class MAAModel(BertPreTrainedModel):
             output_attentions=True,
             output_hidden_states=True
         )
+        
         last_output = outputs[0] # last hidden_state in BERT
         pool_output = outputs[1] # pooled hidden_state over [CLS] in the last layer
         all_hidden_states, all_attentions = outputs[2:] # (bs,)
