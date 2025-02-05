@@ -49,22 +49,23 @@ class SentenceProcessor(object):
         raise NotImplementedError
 
     def _create_examples(self, documents, type):
-        
         try:
-          
-          examples = []
-          for (i, line) in enumerate(documents):
-              guid = "%s-%s" % (type, i)
-              # text = [sentence for sentence in split_sents(line[2])]
-              # text = [[sentence] for sentence in generate_sents(line[2])]
-              text = clean_document(line[2])
-              # text = line[2]
-              examples.append(
-                  InputExample(guid=guid, user=line[0], product=line[1], text=text, label=int(line[3]) - 1, \
-                      category=line[4], keywordlist=line[5]))
-          return examples
+            examples = []
+            for (i, line) in tqdm(enumerate(documents), total=len(documents), desc="Creating examples", unit="doc"):
+                guid = "%s-%s" % (type, i)
+                text = clean_document(line[2])
+                kw_model = KeyBERT(local_model)
+                keyword_list = kw_model.extract_keywords(text, keyphrase_ngram_range=(1, 1), stop_words=None)
+                raw_keyword_list = [item[0] for item in keyword_list]
+                
+                examples.append(
+                    InputExample(guid=guid, user=line[0], product=line[1], text=text, 
+                                label=int(line[3]) - 1, category=line[4], keywordlist=raw_keyword_list)
+                )
+            return examples
         except Exception as e:
-          print(f"Create example error:{e}")
+            print(f"Create example error: {e}")
+
           
     def _read_file(self, dataset):
         # Read the CSV file Add (structure out code)
@@ -72,23 +73,19 @@ class SentenceProcessor(object):
         documents = []
 
         # Iterate over the rows
-        for i in tqdm(range(len(pd_reader[0])), desc="Reading files and processing keywords", unit="doc"):
+        for i in range(len(pd_reader[0])):
             try:
                 # Check if the review (third column) exists and is not empty
                 review = pd_reader[3][i]  # Assuming the review is in the third column (index 3)
-                if review not in [None, ""]:
-                    #get keywords
-                    kw_model = KeyBERT(local_model)
-                    keyword_list = kw_model.extract_keywords(review, keyphrase_ngram_range=(1, 1), stop_words=None)
-                    raw_keyword_list = [item[0] for item in keyword_list]
-                        
-                    # [user, product, review, label, category, [keyword]] 
-                    document = [pd_reader[0][i], pd_reader[1][i], review, pd_reader[2][i], pd_reader[4][i], raw_keyword_list]
-                    documents.append(document)
+                document = [pd_reader[0][i], pd_reader[1][i], review, pd_reader[2][i], pd_reader[4][i]]
+                documents.append(document)
             except KeyError:
                 # In case the column doesn't exist, skip the row
                 
                 continue
+            except:
+                print(type(review), review)
+                exit()
 
         return documents
 
@@ -102,6 +99,7 @@ class SentenceProcessor(object):
                 review = document[2]
                 label = int(document[3]) - 1
                 category = document[4]
+                
                 keywordlist = document[5]
                 sentences.extend([InputExample(user=user, product=product, text=sentence, label=label, category=category, keywordlist=keywordlist) for
                                   sentence in generate_sents(clean_document(review))])

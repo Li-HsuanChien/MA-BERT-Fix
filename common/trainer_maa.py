@@ -168,7 +168,7 @@ class MAATrainer(object):
                 logits = self.net(input_ids=input_ids,
                                     attrs=(usr, prd, ctgy),
                                     pooledkeywordList=pooledkwlist,
-                                    keywordlist = keywordlist
+                                    keywordlist = keywordlist,
                                     attention_mask=attention_mask)[0]
                 
 
