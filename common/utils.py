@@ -359,10 +359,10 @@ def load_document4baseline_from_local(config):
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
         
-        keywordList = load_keyword_list(DATASET_PATH_MAP[config.dataset])
-        keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordFull')
-        pos_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordPos')
-        neg_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
+        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordFull')
+        pos_keyword_itos, pos_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordPos')
+        neg_keyword_itos, neg_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
+        
         config.num_kws = len(keyword_stoi)
         config.num_negkws = len(neg_keyword_stoi)
         config.num_poskws = len(pos_keyword_stoi)
@@ -373,7 +373,7 @@ def load_document4baseline_from_local(config):
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_stoi, pos_keyword_stoi, neg_keyword_stoi
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_keyword_itos, neg_keyword_itos
     except Exception as e:
         print(f"Error in load_document4baseline_from_local: {e}")
         
@@ -404,9 +404,9 @@ def load_document4baseline_from_local(config):
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
         
-        keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordFull')
-        pos_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordPos')
-        neg_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
+        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordFull')
+        pos_keyword_itos, pos_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordPos')
+        neg_keyword_itos, neg_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
         config.num_kws = len(keyword_stoi)
         config.num_negkws = len(neg_keyword_stoi)
         config.num_poskws = len(pos_keyword_stoi)
@@ -417,7 +417,7 @@ def load_document4baseline_from_local(config):
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_stoi, pos_keyword_stoi, neg_keyword_stoi
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_keyword_itos, neg_keyword_itos
 
 
 def save_datasets(config):

@@ -84,7 +84,9 @@ class MAAModel(BertPreTrainedModel):
             self,
             input_ids=None,
             attrs=None,
-            pooledkeyword_ids=None,
+            pooledkeyword=None,
+            positivekeyword=None,
+            negativekeyword=None,
             keywordlist=None,
             attention_mask=None,
             token_type_ids=None,
@@ -94,6 +96,9 @@ class MAAModel(BertPreTrainedModel):
     ):
         
         keyword_embeddings = self.get_word_embeddings(keywordlist)
+        pooled_embeddings = self.get_word_embeddings(pooledkeyword)
+        pos_embeddings = self.get_word_embeddings(pooledkeyword)
+        neg_embeddings = self.get_word_embeddings(pooledkeyword)
         
         print(keyword_embeddings)
         exit() 
