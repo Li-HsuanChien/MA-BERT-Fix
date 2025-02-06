@@ -57,7 +57,7 @@ class SentenceProcessor(object):
                 kw_model = KeyBERT(local_model)
                 keyword_list = kw_model.extract_keywords(text, keyphrase_ngram_range=(1, 1), stop_words=None)
                 raw_keyword_list = [item[0] for item in keyword_list]
-                
+                line[5] = raw_keyword_list
                 examples.append(
                     InputExample(guid=guid, user=line[0], product=line[1], text=text, 
                                 label=int(line[3]) - 1, category=line[4], keywordlist=raw_keyword_list)
@@ -77,7 +77,7 @@ class SentenceProcessor(object):
             try:
                 # Check if the review (third column) exists and is not empty
                 review = pd_reader[3][i]  # Assuming the review is in the third column (index 3)
-                document = [pd_reader[0][i], pd_reader[1][i], review, pd_reader[2][i], pd_reader[4][i]]
+                document = [pd_reader[0][i], pd_reader[1][i], review, pd_reader[2][i], pd_reader[4][i], []]
                 documents.append(document)
             except KeyError:
                 # In case the column doesn't exist, skip the row
@@ -144,8 +144,7 @@ class SentenceProcessor(object):
               category[document[ATTR_MAP["category"]]] += 1
       return tuple([users, products, category]) 
     
-    def _get_keywords_and_counter(self, *datasets):
-        keywordset = set()
+    def _get_keywords(self, *datasets):
         keyword_counter = Counter()
         
         ATTR_MAP = {
@@ -156,9 +155,27 @@ class SentenceProcessor(object):
             for document in dataset:
                 for keyword in document[ATTR_MAP["keywordlist"]]:
                     keyword_counter[keyword] += 1
-                    keywordset.add(keyword)
                 
-        return keywordset, keyword_counter
+        return keyword_counter
+    
+    def _get_polarized_keywords(self, *datasets, classes):
+        poskeywordset = Counter()
+        negkeywordset = Counter()
+        
+        ATTR_MAP = {
+            'label': 3,
+            'keywordlist': 5,
+        }
+        
+        for dataset in datasets:
+            for document in dataset:
+                for keyword in document[ATTR_MAP["keywordlist"]]:
+                    if(document[ATTR_MAP['label']] > (classes-1) / 2 ):
+                        poskeywordset[keyword] += 1
+                    else:
+                        negkeywordset[keyword] += 1
+                
+        return poskeywordset, negkeywordset
 
     # def _get_keywords(self, *datasets):
     #     keywords = set()

@@ -84,7 +84,7 @@ class MAAModel(BertPreTrainedModel):
             self,
             input_ids=None,
             attrs=None,
-            pooledkeywordList=None,
+            pooledkeyword_ids=None,
             keywordlist=None,
             attention_mask=None,
             token_type_ids=None,
@@ -212,6 +212,14 @@ class MAAModel(BertPreTrainedModel):
           print(f"\n{name} output is valid with mean: {tensor.mean().item()}")
           
     def get_word_embeddings(self, words):
+        """words
+            [('braces', 'buliding', 'jen', 'furniture'), 
+            ('facility', 'lost', 'hair', 'building'), 
+            ('city', 'in', 'luckiest', 'storage'), 
+            ('dr', '<PAD>', 'team', 'safely'), 
+            ('patient', '<PAD>', 'denver', 'moved')]
+        
+        """
         from transformers import BertTokenizerFast
         pretrained_weights = 'bert-base-uncased'
         tokenizer = BertTokenizerFast.from_pretrained(pretrained_weights)  
@@ -227,14 +235,14 @@ class MAAModel(BertPreTrainedModel):
         # Get BERT embeddings
         with torch.no_grad():
             outputs = model(**inputs)
+        
+        # Extract last hidden state (outputs[0] is the last hidden state)
+        embeddings = outputs[0]  # Shape: [batch_size, seq_len, hidden_size]
 
-        # Extract last hidden states
-        embeddings = outputs.last_hidden_state  # Shape: [batch_size, seq_len, hidden_size]
+        # Get word IDs (map tokens to words)
+        word_ids = inputs.word_ids(0)
 
-        # Get word IDs (maps tokens to words)
-        word_ids = inputs.word_ids(0)  # List of length seq_len
-
-        # Extract embeddings only for word-level tokens (ignoring subwords)
+        # List to store embeddings for each word (excluding subwords)
         word_embeddings = []
         seen_words = set()
 

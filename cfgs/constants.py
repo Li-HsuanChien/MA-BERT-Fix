@@ -8,8 +8,8 @@ def ensureDirs(*dir_paths):
 
 PRE_TRAINED_VECTOR_PATH = 'pretrained_Vectors'
 PRE_TRAINED_BERT_PATH = 'pretrained_model'
-SAVED_MODEL_PATH = '/content/drive/MyDrive/MA-Bert/saved_model'
-DATASET_PATH = '/content/drive/MyDrive/MA-Bert/corpus'
+SAVED_MODEL_PATH = '/saved_model'
+DATASET_PATH = '/corpus'
 
 ensureDirs(PRE_TRAINED_BERT_PATH, PRE_TRAINED_VECTOR_PATH, SAVED_MODEL_PATH)
 

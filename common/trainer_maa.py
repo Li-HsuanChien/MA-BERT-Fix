@@ -7,7 +7,7 @@ from common.utils import multi_acc, multi_mse, load_document4baseline_from_local
 from models.get_optim import get_Adam_optim, get_Adam_optim_v2
 from models.model import MAAModel
 
-SAVED_MODEL_PATH = '/content/drive/MyDrive/MA-Bert/saved_model'
+SAVED_MODEL_PATH = '/saved_model'
 
 class MAATrainer(object):
     def __init__(self, config):
@@ -17,7 +17,7 @@ class MAATrainer(object):
         self.tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
 
         self.train_itr, self.dev_itr, self.test_itr, self.usr_stoi, \
-        self.prd_stoi, self.ctgy_stoi, self.keyword_list, self.keyword_counter = load_document4baseline_from_local(
+        self.prd_stoi, self.ctgy_stoi, self.keyword_stoi, self.pos_keyword_stoi, self.neg_keyword_stoi = load_document4baseline_from_local(
             config)
         
         model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config)
@@ -159,15 +159,23 @@ class MAATrainer(object):
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
+            pooledkw = self.keyword_stoi
+            positivekw = self.pos_keyword_stoi
+            negativekw = self.neg_keyword_stoi
+            print(pooledkw)
+            print(positivekw)
+            print(negativekw)
+            exit()
+            
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
             ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
-            pooledkwlist = self.keyword_list
+           
             
             try:
                 logits = self.net(input_ids=input_ids,
                                     attrs=(usr, prd, ctgy),
-                                    pooledkeywordList=pooledkwlist,
+                                    pooledkeyword=pooledkw,
                                     keywordlist = keywordlist,
                                     attention_mask=attention_mask)[0]
                 

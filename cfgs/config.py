@@ -74,7 +74,7 @@ __C.version = 'default'
 __C.model = 'model'
 
 #Unsure Hack, unify all save model path to saved_model
-__C.model_save_path = '/content/drive/MyDrive/MA-Bert/saved_model'
+__C.model_save_path = '/saved_model'
 
 # __C.model_save_path = osp.join(__C.ckpts_path, __C.version)
 

@@ -1,0 +1,5 @@
+[('braces', 'buliding', 'jen', 'furniture'), 
+('facility', 'lost', 'hair', 'building'), 
+('city', 'in', 'luckiest', 'storage'), 
+('dr', '<PAD>', 'team', 'safely'), 
+('patient', '<PAD>', 'denver', 'moved')]
