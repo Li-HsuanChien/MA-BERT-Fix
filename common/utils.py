@@ -211,20 +211,9 @@ def save_vectors(path, vocab, field='usr'):
     except Exception as e:
         print(f"Error in save_vector: {e}")
 
-def save_keyword_list(path, keywordlist, field='keywordList'):
-    
-    # list
-    try:
-      torch.save(keywordlist, os.path.join(path, '{}.pt'.format(field)))
-    except Exception as e:
-        print(f"Error in save_keywordList: {e}")
 
 def load_vocab(path, field='usr'):
     # itos, stoi, vectors, dim
-    return torch.load(os.path.join(path, '{}.pt'.format(field)))
-
-def load_keyword_list(path, field='keywordList'):
-    # list
     return torch.load(os.path.join(path, '{}.pt'.format(field)))
 
 def load_baselines_datasets(path, field='train', strategy='tail'):

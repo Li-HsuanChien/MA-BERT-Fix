@@ -5,6 +5,7 @@ from transformers import BertModel, BertPreTrainedModel
 from models.layers.multi_attr_transformer import MAALayer
 from models.layers.classifier import BERTClassificationHead, BERTClassificationHeadWithAttribute
 from models.layers.fusion_layer import Fusion
+from models.layers.kw_bilinear import BilinearAttention
 from transformers.pipelines import zero_shot_image_classification
 
 
@@ -16,7 +17,7 @@ class MAAModel(BertPreTrainedModel):
         self.num_labels = config.num_labels
         self.cus_config = kwargs['cus_config']  #'usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'
         self.type = self.cus_config.type # a,b,c,d, e
-        
+        self.kw_bilinear = BilinearAttention(config)
         
         if(self.cus_config.attributes == 'usr_ctgy'):
             # User embedding
@@ -77,6 +78,7 @@ class MAAModel(BertPreTrainedModel):
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        
 
         self.init_weights()
 
@@ -95,14 +97,15 @@ class MAAModel(BertPreTrainedModel):
             inputs_embeds=None,
     ):
         
+        
+        
+        
         keyword_embeddings = self.get_word_embeddings(keywordlist)
         pooled_embeddings = self.get_word_embeddings(pooledkeyword)
-        pos_embeddings = self.get_word_embeddings(pooledkeyword)
-        neg_embeddings = self.get_word_embeddings(pooledkeyword)
-        
-        print(keyword_embeddings)
-        exit() 
-        
+        pos_embeddings = self.get_word_embeddings(positivekeyword)
+        neg_embeddings = self.get_word_embeddings(negativekeyword)
+          
+
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -124,15 +127,15 @@ class MAAModel(BertPreTrainedModel):
             usr = self.usr_embed(usrs) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
         elif(self.cus_config.attributes == 'prd_ctgy'):
-            prd = self.usr_embed(prds) # (bs, attr_dim)
+            prd = self.prd_embed(prds) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
         elif(self.cus_config.attributes == 'usr_prd_ctgy'):
             usr = self.usr_embed(usrs) # (bs, attr_dim)
-            prd = self.usr_embed(prds) # (bs, attr_dim)
+            prd = self.prd_embed(prds) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
         else:
             usr = self.usr_embed(usrs) # (bs, attr_dim)
-            ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
+            prd = self.prd_embed(prds) # (bs, attr_dim)
                 
         if self.type == 'b':
             hidden_state = self.dropout(last_output)
@@ -183,11 +186,15 @@ class MAAModel(BertPreTrainedModel):
                 else:
                     for i, mmalayer in enumerate(self.ATrans_decoder):
                         hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)                
-                hidden_state = self.dropout(hidden_state)
-                outputs = self.classifier(hidden_state)
-            
+                
+        
 
-        return (outputs, hidden_state)
+        polarity_kw_combined = self.kw_bilinear(hidden_state, pos_embeddings, neg_embeddings)
+        
+        
+        outputs = self.classifier(polarity_kw_combined)  
+          
+        return (outputs, polarity_kw_combined)
             
         
         
