@@ -17,7 +17,7 @@ class MAATrainer(object):
         self.tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
 
         self.train_itr, self.dev_itr, self.test_itr, self.usr_stoi, \
-        self.prd_stoi, self.ctgy_stoi, self.keyword_itos, self.pos_keyword_itos, self.neg_keyword_itos = load_document4baseline_from_local(
+        self.prd_stoi, self.ctgy_stoi, self.keyword_itos, self.pos_embeddings, self.neg_embeddings = load_document4baseline_from_local(
             config)
         
         model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config)
@@ -160,8 +160,8 @@ class MAATrainer(object):
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
             pooledkw = self.keyword_itos
-            positivekw = self.pos_keyword_itos
-            negativekw = self.neg_keyword_itos
+            positivekw = self.pos_embeddings
+            negativekw = self.neg_embeddings
             
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
@@ -172,8 +172,8 @@ class MAATrainer(object):
                 logits = self.net(input_ids=input_ids,
                                     attrs=(usr, prd, ctgy),
                                     pooledkeyword=pooledkw,
-                                    positivekeyword=positivekw,
-                                    negativekeyword=negativekw,
+                                    positivekeyword_embeddings=positivekw,
+                                    negativekeyword_embeddings=negativekw,
                                     keywordlist = keywordlist,
                                     attention_mask=attention_mask)[0]
                 
@@ -233,23 +233,33 @@ class MAATrainer(object):
         total_mse = []
         for step, batch in enumerate(eval_itr):
             start_time = time.time()
-            input_ids, label, usr, prd, ctgy = batch
-            # input_ids = processor4baseline(text, self.tokenizer, self.config)
+            input_ids, label, usr, prd, ctgy, keywordlist = batch
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
+            pooledkw = self.keyword_itos
+            positivekw = self.pos_embeddings
+            negativekw = self.neg_embeddings
+            
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
-            ctgy =  torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
+            ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
             logits = self.net(input_ids=input_ids,
-                              attrs=(usr, prd, ctgy),
-                              attention_mask=attention_mask)[0]
+                                attrs=(usr, prd, ctgy),
+                                pooledkeyword=pooledkw,
+                                positivekeyword_embeddings=positivekw,
+                                negativekeyword_embeddings=negativekw,
+                                keywordlist = keywordlist,
+                                attention_mask=attention_mask)[0]
+            
+
             loss = loss_fn(logits, labels)
             metric_acc = acc_fn(labels, logits)
             metric_mse = mse_fn(labels, logits)
             total_loss.append(loss.data.cpu().numpy())
             total_acc.append(metric_acc.data.cpu().numpy())
             total_mse.append(metric_mse.data.cpu().numpy())
+
 
             # monitoring results on every steps
             end_time = time.time()

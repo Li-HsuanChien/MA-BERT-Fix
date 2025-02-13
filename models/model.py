@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from transformers import BertModel, BertPreTrainedModel
+from transformers import BertModel, BertPreTrainedModel, BertTokenizerFast
 from models.layers.multi_attr_transformer import MAALayer
 from models.layers.classifier import BERTClassificationHead, BERTClassificationHeadWithAttribute
 from models.layers.fusion_layer import Fusion
 from models.layers.kw_bilinear import BilinearAttention
+from models.layers.lightweight_attention import LightweightAttention
+from models.layers.PQ_quantization_attention import PQAttention
 from transformers.pipelines import zero_shot_image_classification
-
 
 
 class MAAModel(BertPreTrainedModel):
@@ -17,7 +18,6 @@ class MAAModel(BertPreTrainedModel):
         self.num_labels = config.num_labels
         self.cus_config = kwargs['cus_config']  #'usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'
         self.type = self.cus_config.type # a,b,c,d, e
-        self.kw_bilinear = BilinearAttention(config)
         
         if(self.cus_config.attributes == 'usr_ctgy'):
             # User embedding
@@ -60,7 +60,7 @@ class MAAModel(BertPreTrainedModel):
             self.prd_embed.weight = nn.Parameter(torch.rand(self.cus_config.num_prds, self.cus_config.attr_dim) * 0.5 - 0.25)        
         
 
-        if self.type not in ['b', 'a']:
+        if self.type in ['c', 'd']:
           self.text = nn.Parameter(torch.rand(1, self.cus_config.attr_dim) * 0.5 - 0.25)
           # print(f"After uniform initialization: {self.text}")
                        
@@ -70,9 +70,11 @@ class MAAModel(BertPreTrainedModel):
             self.fusion = Fusion(self.config.hidden_size,self.cus_config.attr_dim)
             self.layer = nn.ModuleList([BertLayer(config) for _ in range(self.cus_config.n_mmalayer)])
             self.classifier = BERTClassificationHead(config)
-        elif self.text == 'e':
-            #for kw
-            print("kw")
+        elif self.type == 'e':
+            # self.kw_bilinear = BilinearAttention(config)
+            self.kw_bilinear = PQAttention(config)
+            
+            self.classifier = BERTClassificationHead(config)
         else:
             self.classifier = BERTClassificationHeadWithAttribute(self.cus_config)
 
@@ -87,8 +89,8 @@ class MAAModel(BertPreTrainedModel):
             input_ids=None,
             attrs=None,
             pooledkeyword=None,
-            positivekeyword=None,
-            negativekeyword=None,
+            positivekeyword_embeddings=None,
+            negativekeyword_embeddings=None,
             keywordlist=None,
             attention_mask=None,
             token_type_ids=None,
@@ -98,12 +100,6 @@ class MAAModel(BertPreTrainedModel):
     ):
         
         
-        
-        
-        keyword_embeddings = self.get_word_embeddings(keywordlist)
-        pooled_embeddings = self.get_word_embeddings(pooledkeyword)
-        pos_embeddings = self.get_word_embeddings(positivekeyword)
-        neg_embeddings = self.get_word_embeddings(negativekeyword)
           
 
         outputs = self.bert(
@@ -159,11 +155,14 @@ class MAAModel(BertPreTrainedModel):
                 hidden_state = self.fusion(last_output, [usr, prd, ctgy])
             else:
                 hidden_state = self.fusion(last_output, [usr, prd])
-            hidden_state = self.dropout(hidden_state)
+                hidden_state = self.dropout(hidden_state)
             for i, l in enumerate(self.layer):
                 hidden_state = l(hidden_state, extend_attention_mask)[0]
             hidden_state = self.dropout(hidden_state)
             outputs = self.classifier(hidden_state)
+        elif self.type == 'e':
+            hidden_state = self.dropout(last_output)
+            hidden_state = self.kw_bilinear(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings)
         else:
             
             t_self = self.text.expand_as(usr)  # (bs, attr_dim)
@@ -185,16 +184,11 @@ class MAAModel(BertPreTrainedModel):
                         hidden_state = mmalayer([usr, prd, ctgy, t_self], hidden_state, extend_attention_mask)
                 else:
                     for i, mmalayer in enumerate(self.ATrans_decoder):
-                        hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)                
-                
+                        hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)                        
         
-
-        polarity_kw_combined = self.kw_bilinear(hidden_state, pos_embeddings, neg_embeddings)
-        
-        
-        outputs = self.classifier(polarity_kw_combined)  
+        outputs = self.classifier(hidden_state)  
           
-        return (outputs, polarity_kw_combined)
+        return (outputs, hidden_state)
             
         
         
@@ -222,45 +216,4 @@ class MAAModel(BertPreTrainedModel):
           print(f"\nInf detected in {name}")
       else:
           print(f"\n{name} output is valid with mean: {tensor.mean().item()}")
-          
-    def get_word_embeddings(self, words):
-        """words
-            [('braces', 'buliding', 'jen', 'furniture'), 
-            ('facility', 'lost', 'hair', 'building'), 
-            ('city', 'in', 'luckiest', 'storage'), 
-            ('dr', '<PAD>', 'team', 'safely'), 
-            ('patient', '<PAD>', 'denver', 'moved')]
         
-        """
-        from transformers import BertTokenizerFast
-        pretrained_weights = 'bert-base-uncased'
-        tokenizer = BertTokenizerFast.from_pretrained(pretrained_weights)  
-
-
-        # Tokenize words
-        inputs = tokenizer(words, return_tensors='pt', padding=True, truncation=True, is_split_into_words=True)
-
-        # Move input to the same device as the model
-        
-        model = BertModel.from_pretrained('bert-base-uncased')
-
-        # Get BERT embeddings
-        with torch.no_grad():
-            outputs = model(**inputs)
-        
-        # Extract last hidden state (outputs[0] is the last hidden state)
-        embeddings = outputs[0]  # Shape: [batch_size, seq_len, hidden_size]
-
-        # Get word IDs (map tokens to words)
-        word_ids = inputs.word_ids(0)
-
-        # List to store embeddings for each word (excluding subwords)
-        word_embeddings = []
-        seen_words = set()
-
-        for i, word_idx in enumerate(word_ids):
-            if word_idx is not None and word_idx not in seen_words:
-                word_embeddings.append(embeddings[0, i, :])  # Select first batch, i-th token
-                seen_words.add(word_idx)  # Ensure we only pick the first subword
-
-        return torch.stack(word_embeddings)

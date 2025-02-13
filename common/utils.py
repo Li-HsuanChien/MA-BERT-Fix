@@ -211,9 +211,15 @@ def save_vectors(path, vocab, field='usr'):
     except Exception as e:
         print(f"Error in save_vector: {e}")
 
+def save_embeddings(path, KWembeddings, field='positiveKW'):
+    
+    try:
+      torch.save(KWembeddings, os.path.join(path, '{}.pt'.format(field)))
+    except Exception as e:
+        print(f"Error in save_vector: {e}")
 
-def load_vocab(path, field='usr'):
-    # itos, stoi, vectors, dim
+
+def load_pt(path, field='usr'):
     return torch.load(os.path.join(path, '{}.pt'.format(field)))
 
 def load_baselines_datasets(path, field='train', strategy='tail'):
@@ -223,9 +229,9 @@ def load_baselines_datasets(path, field='train', strategy='tail'):
 def load_attr_vocab(dataset, users, products, category):
    
     try:
-        usr_itos, usr_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='usr')
-        prd_itos, prd_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='prd')
-        ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='ctgy')
+        usr_itos, usr_stoi = load_pt(DATASET_PATH_MAP[dataset], field='usr')
+        prd_itos, prd_stoi = load_pt(DATASET_PATH_MAP[dataset], field='prd')
+        ctgy_itos, ctgy_stoi = load_pt(DATASET_PATH_MAP[dataset], field='ctgy')
     except Exception as e:
         print(f"Error in load_attr_vocab: {e}")
         print(f"Rebuilding attr vocab")
@@ -235,17 +241,17 @@ def load_attr_vocab(dataset, users, products, category):
         save_vectors(DATASET_PATH_MAP[dataset], usr_vocab, field='usr')
         save_vectors(DATASET_PATH_MAP[dataset], prd_vocab, field='prd')
         save_vectors(DATASET_PATH_MAP[dataset], ctgy_vocab, field='ctgy')
-        usr_itos, usr_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='usr')
-        prd_itos, prd_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='prd')
-        ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='ctgy')
+        usr_itos, usr_stoi = load_pt(DATASET_PATH_MAP[dataset], field='usr')
+        prd_itos, prd_stoi = load_pt(DATASET_PATH_MAP[dataset], field='prd')
+        ctgy_itos, ctgy_stoi = load_pt(DATASET_PATH_MAP[dataset], field='ctgy')
     return usr_stoi, prd_stoi, ctgy_stoi
 
 def load_keywords(dataset, keyword_counter, pos_keyword_counter, neg_keyword_counter):
    
     try:
-        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordFull')
-        pos_keyword_itos, pos_keyword_counter_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordPos')
-        pos_keyword_itos, neg_keyword_counter_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordNeg')
+        keyword_itos, keyword_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordFull')
+        pos_keyword_itos, pos_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordPos')
+        pos_keyword_itos, neg_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordNeg')
         
     except Exception as e:
         print(f"Error in load_attr_keyword: {e}")
@@ -257,10 +263,26 @@ def load_keywords(dataset, keyword_counter, pos_keyword_counter, neg_keyword_cou
         save_vectors(DATASET_PATH_MAP[dataset], pos_keyword_vocab, field='keywordPos')
         save_vectors(DATASET_PATH_MAP[dataset], neg_keyword_vocab, field='keywordNeg')
         
-        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordFull')
-        pos_keyword_itos, pos_keyword_counter_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordPos')
-        pos_keyword_itos, neg_keyword_counter_stoi = load_vocab(DATASET_PATH_MAP[dataset], field='keywordNeg')
-    return keyword_stoi, pos_keyword_counter_stoi, neg_keyword_counter_stoi
+        keyword_itos, keyword_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordFull')
+        pos_keyword_itos, pos_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordPos')
+        pos_keyword_itos, neg_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordNeg')
+    return keyword_stoi, pos_keyword_itos, pos_keyword_itos
+
+def load_polar_embeddings(dataset, pos_keyword_embeddings, neg_keyword_embeddings):
+   
+    try:
+        pos_keyword_embeddings = load_pt(DATASET_PATH_MAP[dataset], field='positiveKW')
+        neg_keyword_embeddings = load_pt(DATASET_PATH_MAP[dataset], field='negativeKW')
+        
+    except Exception as e:
+        print(f"Error in load_attr_keyword: {e}")
+        
+        save_embeddings(DATASET_PATH_MAP[dataset], pos_keyword_embeddings, field='positiveKW')
+        save_embeddings(DATASET_PATH_MAP[dataset], neg_keyword_embeddings, field='negativeKW')
+        
+        pos_keyword_embeddings = load_pt(DATASET_PATH_MAP[dataset], field='positiveKW')
+        neg_keyword_embeddings = load_pt(DATASET_PATH_MAP[dataset], field='negativeKW')
+    return pos_keyword_embeddings, neg_keyword_embeddings
 
 
 # def load_document4baseline(config, tokenizer):
@@ -341,20 +363,24 @@ def load_document4baseline_from_local(config):
         test_dataloader = DataLoader(test_dataset, batch_size=config.TEST.batch_size)
         
 
-        usr_itos, usr_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='usr')
-        prd_itos, prd_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='prd')
-        ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='ctgy')
+        usr_itos, usr_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='usr')
+        prd_itos, prd_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='prd')
+        ctgy_itos, ctgy_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='ctgy')
         config.num_usrs = len(usr_stoi)
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
         
-        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordFull')
-        pos_keyword_itos, pos_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordPos')
-        neg_keyword_itos, neg_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
+        keyword_itos, keyword_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='keywordFull')
+        pos_keyword_itos, pos_keyword_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='keywordPos')
+        neg_keyword_itos, neg_keyword_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
         
         config.num_kws = len(keyword_stoi)
         config.num_negkws = len(neg_keyword_stoi)
         config.num_poskws = len(pos_keyword_stoi)
+        
+        pos_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='positiveKW')
+        neg_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='negativeKW')
+        
         
         
         config.TRAIN.num_train_optimization_steps = int(
@@ -362,7 +388,7 @@ def load_document4baseline_from_local(config):
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_keyword_itos, neg_keyword_itos
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_embeddings, neg_embeddings
     except Exception as e:
         print(f"Error in load_document4baseline_from_local: {e}")
         
@@ -386,32 +412,35 @@ def load_document4baseline_from_local(config):
         dev_dataloader = DataLoader(dev_dataset, batch_size=config.TEST.batch_size)
         test_dataloader = DataLoader(test_dataset, batch_size=config.TEST.batch_size)
         
-        usr_itos, usr_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='usr')
-        prd_itos, prd_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='prd')
-        ctgy_itos, ctgy_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='ctgy')
+        usr_itos, usr_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='usr')
+        prd_itos, prd_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='prd')
+        ctgy_itos, ctgy_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='ctgy')
         config.num_usrs = len(usr_stoi)
         config.num_prds = len(prd_stoi)
         config.num_ctgy = len(ctgy_stoi)
         
-        keyword_itos, keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordFull')
-        pos_keyword_itos, pos_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordPos')
-        neg_keyword_itos, neg_keyword_stoi = load_vocab(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
+        keyword_itos, keyword_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='keywordFull')
+        pos_keyword_itos, pos_keyword_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='keywordPos')
+        neg_keyword_itos, neg_keyword_stoi = load_pt(DATASET_PATH_MAP[config.dataset], field='keywordNeg')
         config.num_kws = len(keyword_stoi)
         config.num_negkws = len(neg_keyword_stoi)
         config.num_poskws = len(pos_keyword_stoi)
         
+        pos_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='positiveKW')
+        neg_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='negativeKW')
         
         config.TRAIN.num_train_optimization_steps = int(
             len(
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_keyword_itos, neg_keyword_itos
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_embeddings, neg_embeddings
 
 
 def save_datasets(config):
     
     try:
+        print("saving dataset")
         from transformers import BertTokenizer
         pretrained_weights = 'bert-base-uncased'
         tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
@@ -431,7 +460,11 @@ def save_datasets(config):
 
         keyword_counter = processor.get_keywords()
         pos_keyword_counter, neg_keyword_counter = processor.get_polarzied_keywords()
-        keyword_stoi, pos_keyword_stoi, neg_keyword_stoi = load_keywords(config.dataset, keyword_counter, pos_keyword_counter, neg_keyword_counter)
+        keyword_stoi, pos_keyword_itos, neg_keyword_itos = load_keywords(config.dataset, keyword_counter, pos_keyword_counter, neg_keyword_counter)
+        pos_keyword_embeddings = get_word_embeddings(pos_keyword_itos)
+        neg_keyword_embeddings = get_word_embeddings(neg_keyword_itos)
+        
+        load_polar_embeddings(config.dataset,pos_keyword_embeddings, neg_keyword_embeddings)
         config.num_kws = len(keyword_stoi)
 
         
@@ -528,3 +561,42 @@ def default_collate(batch):
         return [default_collate(samples) for samples in transposed]
 
     raise TypeError((error_msg.format(type(batch[0]))))
+
+def get_word_embeddings(words):
+        """words
+            []
+        
+        """
+        from transformers import BertTokenizerFast, BertModel
+        pretrained_weights = 'bert-base-uncased'
+        tokenizer = BertTokenizerFast.from_pretrained(pretrained_weights)  
+
+
+        # Tokenize words
+        inputs = tokenizer(words, return_tensors='pt', padding=True, truncation=True, is_split_into_words=True)
+
+        # Move input to the same device as the model
+        
+        model = BertModel.from_pretrained('bert-base-uncased')
+
+        # Get BERT embeddings
+        with torch.no_grad():
+            outputs = model(**inputs)
+        
+        # Extract last hidden state (outputs[0] is the last hidden state)
+        embeddings = outputs[0]  # Shape: [batch_size, seq_len(unclear), hidden_size]
+        #tokens = tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+        # print(tokens) [CLS]
+        # Get word IDs (map tokens to words)
+        word_ids = inputs.word_ids(0)
+
+        # List to store embeddings for each word (excluding subwords)
+        word_embeddings = []
+        seen_words = set()
+
+        for i, word_idx in enumerate(word_ids):
+            if word_idx is not None and word_idx not in seen_words:
+                word_embeddings.append(embeddings[0, i, :])  # Select first batch, i-th token
+                seen_words.add(word_idx)  # Ensure we only pick the first subword
+
+        return torch.stack(word_embeddings)

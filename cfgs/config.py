@@ -27,7 +27,7 @@ __C.n_mmalayer = 6
 __C.n_delayer = 12
 __C.n_bertlayer = 12
 __C.n_totallayer =12
-__C.type = 'd' # a, b, c, d
+__C.type = 'e' # a, b, c, d, e
 
 # ======================================= #
 # ----------- Training options ---------- #

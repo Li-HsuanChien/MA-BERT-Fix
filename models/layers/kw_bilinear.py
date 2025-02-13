@@ -57,7 +57,7 @@ class BilinearAttention(nn.Module):
         bilinear_out1 = torch.matmul(attention_weights1, K1)  # [batch_size, seq_len, embed_dim]
         bilinear_out2 = torch.matmul(attention_weights2, K2)  # [batch_size, seq_len, embed_dim]
         
-        fused_out = torch.cat([bilinear_out1, bilinear_out2], dim=-1)  # Shape: [batch_size, seq_len, n+m]
+        fused_out = torch.cat([bilinear_out1, bilinear_out2], dim=-1)  # Shape: [batch_size, seq_len, 2*(embed_dim)]
         
         fused_out = self.mlp(fused_out)  # Shape: [batch_size, seq_len, embed_dim]
         

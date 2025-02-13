@@ -374,3 +374,4 @@ def build_vocab_from_iterator(iterator: Iterable, min_freq: int = 1, specials: O
     # Create vocabulary
     return Vocab(OrderedDict((tok, 1) for tok in sorted_tokens))
 
+
