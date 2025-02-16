@@ -162,7 +162,8 @@ class MAAModel(BertPreTrainedModel):
             outputs = self.classifier(hidden_state)
         elif self.type == 'e':
             hidden_state = self.dropout(last_output)
-            hidden_state = self.kw_bilinear(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings)
+            
+            hidden_state = self.KWattention(hidden_state, torch.cat(positivekeyword_embeddings, negativekeyword_embeddings))
         else:
             
             t_self = self.text.expand_as(usr)  # (bs, attr_dim)
