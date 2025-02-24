@@ -104,7 +104,8 @@ class MAATrainer(object):
             print("\r" + logs)
 
             # logging training logs
-            self.logging(self.config.log_path + '/log_run_' + self.config.dataset + '_' + self.config.version + '.txt',
+            self.logging(self.config.log_path +
+            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt',
                          logs)
             self.net.eval()
             with torch.no_grad():
@@ -113,7 +114,8 @@ class MAATrainer(object):
             print("\r" + eval_logs)
 
             # logging evaluating logs
-            self.logging(self.config.log_path + '/log_run_' + self.config.dataset + '_' + self.config.version + '.txt',
+            self.logging(self.config.log_path +
+            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt',
                          eval_logs)
 
             # early stopping

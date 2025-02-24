@@ -57,10 +57,10 @@ class SentenceProcessor(object):
                 kw_model = KeyBERT(local_model)
                 keyword_list = kw_model.extract_keywords(text, keyphrase_ngram_range=(1, 1), stop_words=None)
                 raw_keyword_list = [item[0] for item in keyword_list]
-                line[5] = raw_keyword_list
+                line[5] = raw_keyword_list[0:1]
                 examples.append(
                     InputExample(guid=guid, user=line[0], product=line[1], text=text, 
-                                label=int(line[3]) - 1, category=line[4], keywordlist=raw_keyword_list)
+                                label=int(line[3]) - 1, category=line[4], keywordlist=line[5])
                 )
             return examples
         except Exception as e:
@@ -145,19 +145,26 @@ class SentenceProcessor(object):
       return tuple([users, products, category]) 
     
     def _get_keywords(self, *datasets):
-        keyword_counter = Counter()
-        
-        ATTR_MAP = {
-            'keywordlist': 5,
-        }
-        
-        for dataset in datasets:
-            for document in dataset:
-                for keyword in document[ATTR_MAP["keywordlist"]]:
-                    keyword_counter[keyword] += 1
-                
-        return keyword_counter
-    
+      keyword_counter = Counter()
+      
+      ATTR_MAP = {
+          'keywordlist': 5,
+      }
+      
+      try:
+          for dataset in datasets:
+              for document in dataset:
+                  try:
+                      for keyword in document[ATTR_MAP["keywordlist"]]:
+                          keyword_counter[keyword] += 1
+                  except (IndexError, KeyError, TypeError) as e:
+                      print(f"Skipping document due to error: {e}")
+                      
+      except Exception as e:
+          print(f"Unexpected error: {e}")
+
+      return keyword_counter
+
     def _get_polarized_keywords(self, *datasets, classes):
         poskeywordset = Counter()
         negkeywordset = Counter()
@@ -167,14 +174,21 @@ class SentenceProcessor(object):
             'keywordlist': 5,
         }
         
-        for dataset in datasets:
-            for document in dataset:
-                for keyword in document[ATTR_MAP["keywordlist"]]:
-                    if(document[ATTR_MAP['label']] > (classes-1) / 2 ):
-                        poskeywordset[keyword] += 1
-                    else:
-                        negkeywordset[keyword] += 1
-                
+        try:
+            for dataset in datasets:
+                for document in dataset:
+                    try:
+                        for keyword in document[ATTR_MAP["keywordlist"]]:
+                            if document[ATTR_MAP['label']] > (classes - 1) / 2:
+                                poskeywordset[keyword] += 1
+                            else:
+                                negkeywordset[keyword] += 1
+                    except (IndexError, KeyError, TypeError) as e:
+                        print(f"Skipping document due to error: {e}")
+                        
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+
         return poskeywordset, negkeywordset
 
     # def _get_keywords(self, *datasets):

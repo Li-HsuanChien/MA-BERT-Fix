@@ -251,7 +251,7 @@ def load_keywords(dataset, keyword_counter, pos_keyword_counter, neg_keyword_cou
     try:
         keyword_itos, keyword_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordFull')
         pos_keyword_itos, pos_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordPos')
-        pos_keyword_itos, neg_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordNeg')
+        neg_keyword_itos, neg_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordNeg')
         
     except Exception as e:
         print(f"Error in load_attr_keyword: {e}")
@@ -265,8 +265,8 @@ def load_keywords(dataset, keyword_counter, pos_keyword_counter, neg_keyword_cou
         
         keyword_itos, keyword_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordFull')
         pos_keyword_itos, pos_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordPos')
-        pos_keyword_itos, neg_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordNeg')
-    return keyword_stoi, pos_keyword_itos, pos_keyword_itos
+        neg_keyword_itos, neg_keyword_counter_stoi = load_pt(DATASET_PATH_MAP[dataset], field='keywordNeg')
+    return keyword_stoi, pos_keyword_itos, neg_keyword_itos
 
 def load_polar_embeddings(dataset, pos_keyword_embeddings, neg_keyword_embeddings):
    
@@ -380,7 +380,8 @@ def load_document4baseline_from_local(config):
         
         pos_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='positiveKW')
         neg_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='negativeKW')
-        
+        config.num_negembed = neg_embeddings.size(0)
+        config.num_posembed = pos_embeddings.size(0)
         
         
         config.TRAIN.num_train_optimization_steps = int(
@@ -428,7 +429,8 @@ def load_document4baseline_from_local(config):
         
         pos_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='positiveKW')
         neg_embeddings = load_pt(DATASET_PATH_MAP[config.dataset], field='negativeKW')
-        
+        config.num_negembed = neg_embeddings.size(0)
+        config.num_posembed = pos_embeddings.size(0)
         config.TRAIN.num_train_optimization_steps = int(
             len(
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch

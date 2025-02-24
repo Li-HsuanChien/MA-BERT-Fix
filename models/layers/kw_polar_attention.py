@@ -1,7 +1,7 @@
 import torch
-from torch.cuda.amp.autocast_mode import custom_fwd
 import torch.nn as nn
 import torch.nn.functional as F
+import sys
 
 class KWMultiHeadAttention(nn.Module):
     def __init__(self, config, cus_config):
@@ -90,17 +90,17 @@ class KWBilinearAttention(nn.Module):
         """
         Inputs:
         - sequence: Tensor of shape (batch_size, seq_length, hidden_dim)
-        - keyword: Tensor of shape (1, 1, hidden_dim)
+        - keyword: Tensor of shape (1, hidden_dim)
 
         Output:
         - context: Tensor of shape (batch_size, seq_length, hidden_dim)
         """
         batch_size, seq_length, _ = sequence.size()
 
-        # Step 1: BiLinear transformations for Q, K, V
-        Q = torch.matmul(sequence,self.WQ) * keyword            # Shape: (batch_size, seq_length, hidden_dim)
-        K = torch.matmul(sequence,self.WK) * keyword             # Shape: (batch_size, 1, hidden_dim)
-        V = torch.matmul(sequence,self.WV) * keyword             # Shape: (batch_size, 1, hidden_dim)
+        # Step 1: Bilinear transformations for Q, K, V
+        Q = torch.matmul(sequence,self.WQ) * keyword.unsqueeze(0)            # Shape: (batch_size, seq_length, hidden_dim)
+        K = torch.matmul(sequence,self.WK) * keyword.unsqueeze(0)             
+        V = torch.matmul(sequence,self.WV) * keyword.unsqueeze(0)             
 
         
 
@@ -126,54 +126,56 @@ class KWBilinearAttention(nn.Module):
         # Step 7: Concatenate heads
         context = context.permute(0, 2, 1, 3).contiguous()  # Shape: (batch_size, seq_length, num_heads, head_dim)
         context = context.view(batch_size, seq_length, self.hidden_dim)  # Shape: (batch_size, seq_length, hidden_dim)
-
+        print(context.shape)
         # Step 8: Final linear projection
         output = self.final_projection(context)  # Shape: (batch_size, seq_length, hidden_dim)
 
         return output
 
 
-class KWattention(nn.Module):
+class KWPolarattention(nn.Module):
     def __init__(self, config, cus_config):
-        super(KWattention, self).__init__()
-        self.attentiontype = KWMultiHeadAttention(config, cus_config)
-        self.hidden_dim = cus_config.attr_dim
-        self.poskwcount = cus_config.num_posembed
-        self.negkwcount = cus_config.num_negembed
-        # self.kwcount = cus_config.kw_attention_nums
-        self.kwcount = 150
+        super(KWPolarattention, self).__init__()
+        self.attentiontypepos = KWMultiHeadAttention(config, cus_config)
+        self.attentiontypeneg = KWMultiHeadAttention(config, cus_config)
+        self.kwcountpos = 50
+        self.kwcountneg = 50
         self.batch_size = cus_config.TRAIN.batch_size 
-        self.pad_tensor = torch.zeros((abs(self.poskwcount - self.negkwcount), self.hidden_dim)).to(cus_config.device)  # Padding with zeros
 
         # Simple MLP (Multi-Layer Perceptron) for fusion
-        self.mlp = nn.Sequential(
-            nn.Linear(self.kwcount, 1),  # Reduce the keyword dimension to 1
+        self.mlppos = nn.Sequential(
+            nn.Linear(self.kwcountpos, 1),  # Reduce the keyword dimension to 1
+        )
+        self.mlpneg = nn.Sequential(
+            nn.Linear(self.kwcountneg, 1),  # Reduce the keyword dimension to 1
+        )
+        self.mlpfuse = nn.Sequential(
+            nn.Linear(2, 1)  # Reduce the keyword dimension to 1
+            # nn.ReLU(),                    # Activation (you can adjust or add more layers if needed)
+            # nn.Linear(8, 1),  # Reduce the keyword dimension to 1
         )
 
-    def forward(self, sequence, positive_keywords, negative_keywords):
-        outputs = []
-        # Padding the smaller tensor
-        diff = self.poskwcount - self.negkwcount
-        if diff > 0:
-            negative_keywords = torch.cat((negative_keywords, self.pad_tensor), dim=0)
-        elif diff < 0:
-            positive_keywords = torch.cat((positive_keywords, self.pad_tensor), dim=0)
-        keyword_pool = torch.stack((positive_keywords, negative_keywords), dim=1).reshape(-1, positive_keywords.shape[1])
-        # # Interleave along dim=0
-       
-        # keyword_pool = torch.cat((positive_keywords, negative_keywords), dim=0)
+    def forward(self, sequence, poskeywords, negkeywords):
+        outputspos = []
+        outputsneg = []
+        
+
         # Apply attention for each keyword
-        for i in range(self.kwcount):
-            temp = self.attentiontype(sequence, keyword_pool[i].unsqueeze(0))  # Shape: (batch_size, seq_len, hidden_dimension)
-            outputs.append(temp)
+        for i in range(self.kwcountpos):
+            temppos = self.attentiontypepos(sequence, poskeywords[i])  # Shape: (batch_size, seq_len, hidden_dimension)
+            outputspos.append(temppos)
+        for i in range(self.kwcountneg):
+            tempneg = self.attentiontypeneg(sequence, negkeywords[i])  # Shape: (batch_size, seq_len, hidden_dimension)
+            outputsneg.append(tempneg)
 
         # Concatenate along the batch dimension
-        stacked_output = torch.stack(outputs, dim=3)  # Shape: (batch_size, seq_len, hidden_dimension, kwcount)
-
+        stacked_output_pos = torch.stack(outputspos, dim=3)  # Shape: (batch_size, seq_len, hidden_dimension, kwcount)
+        stacked_output_neg = torch.stack(outputsneg, dim=3) # Shape: (batch_size, seq_len, hidden_dimension, kwcount)
+        
         # Apply MLP along the keyword dimension
-        fused_output = self.mlp(stacked_output)  # Shape: (batch_size, seq_len, hidden_dimension, 1)
-
-        # Squeeze the keyword dimension (size 1) to get shape (batch_size, seq_len, hidden_dimension)
-        fused_output = fused_output.squeeze(-1)
+        fused_output_pos = self.mlppos(stacked_output_pos)  # Shape: (batch_size, seq_len, hidden_dimension, 1(kwcount))
+        fused_output_neg = self.mlpneg(stacked_output_neg)  # Shape: (batch_size, seq_len, hidden_dimension, 1(kwcount))
+        # Squeeze the keyword dimension (size 1) to get shape (1, seq_len, hidden_dimension)
+        fused_output = self.mlpfuse(torch.cat((fused_output_pos, fused_output_neg), dim=3)).squeeze(-1)
 
         return fused_output

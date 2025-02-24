@@ -8,6 +8,8 @@ from models.layers.fusion_layer import Fusion
 from models.layers.kw_bilinear import BilinearAttention
 from models.layers.lightweight_attention import LightweightAttention
 from models.layers.PQ_quantization_attention import PQAttention
+from models.layers.kw_attention import KWattention
+from models.layers.kw_polar_attention import KWPolarattention
 from transformers.pipelines import zero_shot_image_classification
 
 
@@ -72,11 +74,11 @@ class MAAModel(BertPreTrainedModel):
             self.classifier = BERTClassificationHead(config)
         elif self.type == 'e':
             # self.kw_bilinear = BilinearAttention(config)
-            self.kw_bilinear = PQAttention(config)
+            self.KWattention = KWattention(config, self.cus_config)
             
             self.classifier = BERTClassificationHead(config)
         else:
-            self.classifier = BERTClassificationHeadWithAttribute(self.cus_config)
+            self.classifier = BERTClassificationHeadWithAttribute(config)
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -162,8 +164,8 @@ class MAAModel(BertPreTrainedModel):
             outputs = self.classifier(hidden_state)
         elif self.type == 'e':
             hidden_state = self.dropout(last_output)
-            
-            hidden_state = self.KWattention(hidden_state, torch.cat(positivekeyword_embeddings, negativekeyword_embeddings))
+            hidden_state = self.KWattention(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings)
+            hidden_state = self.dropout(hidden_state)
         else:
             
             t_self = self.text.expand_as(usr)  # (bs, attr_dim)
