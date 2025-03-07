@@ -74,7 +74,7 @@ class MAAModel(BertPreTrainedModel):
             self.classifier = BERTClassificationHead(config)
         elif self.type == 'e':
             # self.kw_bilinear = BilinearAttention(config)
-            self.KWattention = KWattention(config, self.cus_config)
+            self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_mmalayer)])
             
             self.classifier = BERTClassificationHead(config)
         else:
@@ -163,9 +163,15 @@ class MAAModel(BertPreTrainedModel):
             hidden_state = self.dropout(hidden_state)
             outputs = self.classifier(hidden_state)
         elif self.type == 'e':
-            hidden_state = self.dropout(last_output)
-            hidden_state = self.KWattention(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings)
-            hidden_state = self.dropout(hidden_state)
+            extend_attention_mask = self.get_attention_mask(attention_mask)
+
+            if 12 >= self.cus_config.n_bertlayer > 0:
+                last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+                hidden_state = self.dropout(last_output)
+                for i, layer in enumerate(self.ATrans_decoder):
+                    hidden_state = layer(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings, extend_attention_mask) 
+
+           
         else:
             
             t_self = self.text.expand_as(usr)  # (bs, attr_dim)

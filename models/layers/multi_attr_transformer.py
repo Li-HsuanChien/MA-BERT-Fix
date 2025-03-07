@@ -121,7 +121,6 @@ class BertSelfOutput(nn.Module):
         super().__init__()
         self.dense = nn.ModuleList([nn.Linear(cus_config.attr_dim, cus_config.attr_dim) for _ in range(cus_config.num_attrs)])
         self.project = nn.Linear(cus_config.attr_dim*cus_config.num_attrs, cus_config.attr_dim)
-        self.all_dense = nn.Linear(cus_config.attr_dim*cus_config.num_attrs, cus_config.attr_dim)
         self.LayerNorm = BertLayerNorm(cus_config.attr_dim, eps=cus_config.layer_norm_eps)
         self.dropout = nn.Dropout(cus_config.hidden_dropout_prob)
 
