@@ -13,7 +13,7 @@ ACT2FN = {"gelu": gelu, "relu": torch.nn.functional.relu, "swish": silu, "gelu_n
 
 class KWBilinearAttention(nn.Module):
     def __init__(self, config, cus_config):
-        super(KWBilinearAttention, self).__init__()
+        super().__init__()
         self.hidden_dim = cus_config.attr_dim
         self.num_heads = cus_config.num_attr_heads
 
@@ -24,9 +24,9 @@ class KWBilinearAttention(nn.Module):
         self.head_dim = self.hidden_dim// self.num_heads 
 
         # Bilinear layers for Q, K, V
-        self.WQ = nn.Bilinear(self.hidden_dim, self.hidden_dim)  # For the first attention with n
-        self.WK = nn.Bilinear(self.hidden_dim, self.hidden_dim)
-        self.WV = nn.Bilinear(self.hidden_dim, self.hidden_dim)
+        self.WQ = Bilinear(self.hidden_dim, self.hidden_dim)  # For the first attention with n
+        self.WK = Bilinear(self.hidden_dim, self.hidden_dim)
+        self.WV = Bilinear(self.hidden_dim, self.hidden_dim)
         # Final linear projection
         self.final_projection = nn.Linear(self.hidden_dim, self.hidden_dim)
 
@@ -81,8 +81,8 @@ class KWBilinearAttention(nn.Module):
 
 class KWattentionLayer(nn.Module):
     def __init__(self, config, cus_config):
-        super(KWattentionLayer, self).__init__()
-        self.attentiontype = KWMultiHeadAttention(config, cus_config)
+        super().__init__()
+        self.attentiontype = KWBilinearAttention(config, cus_config)
         self.hidden_dim = cus_config.attr_dim
         self.poskwcount = cus_config.num_posembed
         self.negkwcount = cus_config.num_negembed
@@ -126,14 +126,13 @@ class KWattentionLayer(nn.Module):
 
 class KWattention(nn.Module):
     def __init__(self, config, cus_config):
-        super(KWattentionLayer, self).__init__()
+        super().__init__()
         self.attentionLayer = KWattentionLayer(config, cus_config)
         self.bottleneck = Bottleneck(cus_config)
 
     def forward(self, hidden_state, positive_keywords, negative_keywords, attention_mask):
-        attention_output = self.attention(hidden_state, positive_keywords, negative_keywords, attention_mask)
-        intermediate_output = self.intermediate(attention_output)
-        outputs = self.output(intermediate_output, attention_output)
+        attention_output = self.attentionLayer(hidden_state, positive_keywords, negative_keywords, attention_mask)
+        outputs = self.bottleneck(attention_output)
         return outputs
 
 class Bottleneck(nn.Module):
@@ -150,12 +149,12 @@ class Bottleneck(nn.Module):
         self.dropout = nn.Dropout(cus_config.hidden_dropout_prob)
 
     def forward(self, hidden_states):
-        hiddenstates_down = self.densedown(input_tensor)
-        hiddenstates_down = self.intermediate_act_fn(hiddenstates_down)
-        hiddenstates_down = self.dense(hiddenstates_down)
+        hidden_states_down = self.densedown(hidden_states)
+        hidden_states_down = self.intermediate_act_fn(hidden_states_down)
+        hidden_states_up = self.denseup(hidden_states_down)
 
 
-        hidden_states_up = self.dropout(hiddenstates_down)
+        hidden_states_up = self.dropout(hidden_states_up)
         hidden_states = self.LayerNorm(hidden_states_up + hidden_states)
 
         return hidden_states
