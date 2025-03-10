@@ -80,10 +80,11 @@ class MAATrainer(object):
         return logs
 
     def train(self):
+        
         # Save log information
         logfile = open(
             self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt',
+            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
             'a+'
         )
         logfile.write(
@@ -105,7 +106,7 @@ class MAATrainer(object):
 
             # logging training logs
             self.logging(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt',
+            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
                          logs)
             self.net.eval()
             with torch.no_grad():
@@ -115,7 +116,7 @@ class MAATrainer(object):
 
             # logging evaluating logs
             self.logging(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt',
+            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
                          eval_logs)
 
             # early stopping
@@ -136,9 +137,9 @@ class MAATrainer(object):
                     early_stop_logs = self.config.log_path + '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt' + "\n" + \
                                       "Early Stopping. Epoch: {}, Best Dev Acc: {}".format(epoch, self.best_dev_acc)
                     print(early_stop_logs)
-                    self.logging(
-                        self.config.log_path + '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt',
-                        early_stop_logs)
+                    self.logging(self.config.log_path +
+            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
+                         eval_logs)
                     break
 
     def train_epoch(self):
