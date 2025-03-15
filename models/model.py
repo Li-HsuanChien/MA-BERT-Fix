@@ -19,6 +19,7 @@ class MAAModel(BertPreTrainedModel):
         self.config = config
         self.num_labels = config.num_labels
         self.cus_config = kwargs['cus_config']  #'usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'
+        self.interleaved_keyword_pool = kwargs['interleaved_keyword_pool']
         self.type = self.cus_config.type # a,b,c,d, e
         
         if(self.cus_config.attributes == 'usr_ctgy'):
@@ -74,6 +75,14 @@ class MAAModel(BertPreTrainedModel):
             self.classifier = BERTClassificationHead(config)
         elif self.type == 'e':
             # self.kw_bilinear = BilinearAttention(config)
+            self.keyword_embeddings = self.interleaved_keyword_pool
+            
+            self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_mmalayer)])
+            
+            self.classifier = BERTClassificationHead(config)
+        elif self.type == 'f':
+            # self.kw_bilinear = BilinearAttention(config)
+            self.keyword_embeddings = nn.Parameter(self.interleaved_keyword_pool.clone(), requires_grad=True)
             self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_mmalayer)])
             
             self.classifier = BERTClassificationHead(config)
@@ -162,16 +171,15 @@ class MAAModel(BertPreTrainedModel):
                 hidden_state = l(hidden_state, extend_attention_mask)[0]
             hidden_state = self.dropout(hidden_state)
             outputs = self.classifier(hidden_state)
-        elif self.type == 'e':
+        elif self.type == 'e' or self.type == 'f':
             extend_attention_mask = self.get_attention_mask(attention_mask)
 
             if 12 >= self.cus_config.n_bertlayer > 0:
                 last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
-                hidden_state = self.dropout(last_output)
-                for i, layer in enumerate(self.ATrans_decoder):
-                    hidden_state = layer(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings, extend_attention_mask) 
+            hidden_state = self.dropout(last_output)
+            for i, layer in enumerate(self.ATrans_decoder):
+                hidden_state = layer(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings, extend_attention_mask, self.keyword_embeddings)
 
-           
         else:
             
             t_self = self.text.expand_as(usr)  # (bs, attr_dim)

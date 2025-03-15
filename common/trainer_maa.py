@@ -19,8 +19,21 @@ class MAATrainer(object):
         self.train_itr, self.dev_itr, self.test_itr, self.usr_stoi, \
         self.prd_stoi, self.ctgy_stoi, self.keyword_itos, self.pos_embeddings, self.neg_embeddings = load_document4baseline_from_local(
             config)
+        self.poskwcount = config.num_posembed
+        self.negkwcount = config.num_negembed
+        self.pad_tensor = torch.zeros((abs(self.poskwcount - self.negkwcount), self.config.hidden_size)).to(config.device)  # Padding with zeros
+        diff = self.poskwcount - self.negkwcount
+        positive_keywords = self.pos_embeddings.to(config.device) 
+        negative_keywords = self.neg_embeddings.to(config.device) 
+        if diff > 0:
+            negative_keywords = torch.cat((negative_keywords, self.pad_tensor), dim=0)
+        elif diff < 0:
+            positive_keywords = torch.cat((positive_keywords , self.pad_tensor), dim=0)
+        keyword_pool = torch.stack((positive_keywords, negative_keywords), dim=1).reshape(-1, positive_keywords.shape[1])
         
-        model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config)
+        
+        
+        model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config, interleaved_keyword_pool=keyword_pool)
         if self.config.n_gpu > 1:
             self.net = torch.nn.DataParallel(model).to(config.device)
             # self.net = model.to(config.device)
@@ -57,13 +70,20 @@ class MAATrainer(object):
             print("\r" + eval_logs)
 
     def empty_log(self, version):
-        if (os.path.exists(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt')):
-            os.remove(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt')
+        log_dir = self.config.log_path
+        log_filename = f"log_run_{self.config.dataset}_{self.config.version}_{self.config.attributes}_KW-{self.config.kw_attention_nums}_layers-{self.config.n_mmalayer}type-{self.config.type}.txt"
+        log_path = os.path.join(log_dir, log_filename)
+
+        if os.path.exists(log_path):
+            # Loop to find an available name
+            num = 1
+            while os.path.exists(os.path.join(log_dir, f"{log_filename}_{num}")):
+                num += 1
+            new_log_path = os.path.join(log_dir, f"{log_filename}_{num}")
+            os.rename(log_path, new_log_path)
+
         print('Initializing log file ........')
-        print('Finished!')
-        print('')
+        print('Finished!\n')
 
     def logging(self, log_file, logs):
         logfile = open(
@@ -80,11 +100,12 @@ class MAATrainer(object):
         return logs
 
     def train(self):
-        
+        log_dir = self.config.log_path
+        log_filename = f"log_run_{self.config.dataset}_{self.config.version}_{self.config.attributes}_KW-{self.config.kw_attention_nums}_layers-{self.config.n_mmalayer}type-{self.config.type}.txt"
+        log_path = os.path.join(log_dir, log_filename)
         # Save log information
         logfile = open(
-            self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
+            log_path,
             'a+'
         )
         logfile.write(
@@ -105,9 +126,7 @@ class MAATrainer(object):
             print("\r" + logs)
 
             # logging training logs
-            self.logging(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
-                         logs)
+            self.logging(log_path,logs)
             self.net.eval()
             with torch.no_grad():
                 eval_loss, eval_acc, eval_rmse = self.eval(self.dev_itr)
@@ -115,9 +134,7 @@ class MAATrainer(object):
             print("\r" + eval_logs)
 
             # logging evaluating logs
-            self.logging(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
-                         eval_logs)
+            self.logging(log_path, eval_logs)
 
             # early stopping
             if eval_acc > self.best_dev_acc:
@@ -134,12 +151,10 @@ class MAATrainer(object):
             else:
                 self.unimproved_iters += 1
                 if self.unimproved_iters >= self.config.TRAIN.patience and self.early_stop == True:
-                    early_stop_logs = self.config.log_path + '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '.txt' + "\n" + \
+                    early_stop_logs = log_path + "\n" + \
                                       "Early Stopping. Epoch: {}, Best Dev Acc: {}".format(epoch, self.best_dev_acc)
                     print(early_stop_logs)
-                    self.logging(self.config.log_path +
-            '/log_run_' + self.config.dataset + '_' + self.config.version + '_' + self.config.attributes + '_KW-' + str(self.config.kw_attention_nums) + '_layers-' + str(self.config.n_mmalayer) + '.txt',
-                         eval_logs)
+                    self.logging(log_path, early_stop_logs)
                     break
 
     def train_epoch(self):

@@ -28,7 +28,7 @@ __C.n_delayer = 12
 __C.n_bertlayer = 12
 __C.n_totallayer =12
 __C.kw_attention_nums = 1
-__C.type = 'e' # a, b, c, d, e
+__C.type = 'e' # a, b, c, d, e, f
 
 # ======================================= #
 # ----------- Training options ---------- #

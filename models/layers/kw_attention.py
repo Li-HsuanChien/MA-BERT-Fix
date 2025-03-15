@@ -86,8 +86,8 @@ class KWattentionLayer(nn.Module):
         self.hidden_dim = cus_config.attr_dim
         self.poskwcount = cus_config.num_posembed
         self.negkwcount = cus_config.num_negembed
-        # self.kwcount = cus_config.kw_attention_nums
-        self.kwcount = 100
+        self.kwcount = cus_config.kw_attention_nums
+        # self.kwcount = 100
         self.batch_size = cus_config.TRAIN.batch_size 
         self.pad_tensor = torch.zeros((abs(self.poskwcount - self.negkwcount), self.hidden_dim)).to(cus_config.device)  # Padding with zeros
 
@@ -96,21 +96,13 @@ class KWattentionLayer(nn.Module):
             nn.Linear(self.kwcount, 1),  # Reduce the keyword dimension to 1
         )
 
-    def forward(self, hidden_state, positive_keywords, negative_keywords, attention_mask):
+    def forward(self, hidden_state, positive_keywords, negative_keywords, attention_mask, interleaved_embeddings):
         outputs = []
-        # Padding the smaller tensor
-        diff = self.poskwcount - self.negkwcount
-        if diff > 0:
-            negative_keywords = torch.cat((negative_keywords, self.pad_tensor), dim=0)
-        elif diff < 0:
-            positive_keywords = torch.cat((positive_keywords, self.pad_tensor), dim=0)
-        keyword_pool = torch.stack((positive_keywords, negative_keywords), dim=1).reshape(-1, positive_keywords.shape[1])
-        # # Interleave along dim=0
        
         # keyword_pool = torch.cat((positive_keywords, negative_keywords), dim=0)
         # Apply attention for each keyword
         for i in range(self.kwcount):
-            temp = self.attentiontype(hidden_state, keyword_pool[i].unsqueeze(0), attention_mask)  # Shape: (batch_size, seq_len, hidden_dimension)
+            temp = self.attentiontype(hidden_state, interleaved_embeddings[i].unsqueeze(0), attention_mask)  # Shape: (batch_size, seq_len, hidden_dimension)
             outputs.append(temp)
 
         # Concatenate along the batch dimension
@@ -130,8 +122,8 @@ class KWattention(nn.Module):
         self.attentionLayer = KWattentionLayer(config, cus_config)
         self.bottleneck = Bottleneck(cus_config)
 
-    def forward(self, hidden_state, positive_keywords, negative_keywords, attention_mask):
-        attention_output = self.attentionLayer(hidden_state, positive_keywords, negative_keywords, attention_mask)
+    def forward(self, hidden_state, positive_keywords, negative_keywords, attention_mask, interleaved_embeddings):
+        attention_output = self.attentionLayer(hidden_state, positive_keywords, negative_keywords, attention_mask, interleaved_embeddings)
         outputs = self.bottleneck(attention_output)
         return outputs
 
