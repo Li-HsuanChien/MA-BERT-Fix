@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 from transformers import BertModel, BertPreTrainedModel, BertTokenizerFast
 from models.layers.multi_attr_transformer import MAALayer
-from models.layers.classifier import BERTClassificationHead, BERTClassificationHeadWithAttribute
+from models.layers.classifier import BERTClassificationHead, BERTClassificationHeadWithAttribute, BERTClassificationDoubleSize
 from models.layers.fusion_layer import Fusion
 from models.layers.kw_bilinear import BilinearAttention
 from models.layers.lightweight_attention import LightweightAttention
@@ -11,6 +11,7 @@ from models.layers.PQ_quantization_attention import PQAttention
 from models.layers.kw_attention import KWattention
 from models.layers.kw_polar_attention import KWPolarattention
 from transformers.pipelines import zero_shot_image_classification
+from models.layers.kw_injected_attention import ContextualKeywordBERT
 
 
 class MAAModel(BertPreTrainedModel):
@@ -20,6 +21,9 @@ class MAAModel(BertPreTrainedModel):
         self.num_labels = config.num_labels
         self.cus_config = kwargs['cus_config']  #'usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'
         self.interleaved_keyword_pool = kwargs['interleaved_keyword_pool']
+        self.positivekeyword_embeddings = kwargs['positivekeyword_embeddings']
+        self.negativekeyword_embeddings = kwargs['negativekeyword_embeddings']
+        
         self.type = self.cus_config.type # a,b,c,d, e
         
         if(self.cus_config.attributes == 'usr_ctgy'):
@@ -74,18 +78,29 @@ class MAAModel(BertPreTrainedModel):
             self.layer = nn.ModuleList([BertLayer(config) for _ in range(self.cus_config.n_mmalayer)])
             self.classifier = BERTClassificationHead(config)
         elif self.type == 'e':
-            # self.kw_bilinear = BilinearAttention(config)
             self.keyword_embeddings = self.interleaved_keyword_pool
             
-            self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_mmalayer)])
+            self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_kwalayer)])
             
             self.classifier = BERTClassificationHead(config)
         elif self.type == 'f':
-            # self.kw_bilinear = BilinearAttention(config)
             self.keyword_embeddings = nn.Parameter(self.interleaved_keyword_pool.clone(), requires_grad=True)
-            self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_mmalayer)])
+            self.ATrans_decoder = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_kwalayer)])
             
             self.classifier = BERTClassificationHead(config)
+        elif self.type == 'g':
+            self.keyword_embeddings = nn.Parameter(self.interleaved_keyword_pool.clone(), requires_grad=True)
+            self.KWAttention = nn.ModuleList([KWattention(config, self.cus_config) for _ in range(self.cus_config.n_kwalayer)])
+            self.text = nn.Parameter(torch.rand(1, self.cus_config.attr_dim) * 0.5 - 0.25)
+            self.MMA = nn.ModuleList([MAALayer(config, self.cus_config) for _ in range(self.cus_config.n_mmalayer)])
+            self.classifier = BERTClassificationHead(config)
+        elif self.type == 'h':
+            self.keyword_embeddings = self.interleaved_keyword_pool
+            self.model = ContextualKeywordBERT(config, self.cus_config)
+            self.classifier = BERTClassificationDoubleSize(config)
+        elif self.type == 'i':
+            self.model = KWPolarattention(config, self.cus_config)
+            self.classifier = BERTClassificationDoubleSize(config)
         else:
             self.classifier = BERTClassificationHeadWithAttribute(config)
 
@@ -99,10 +114,6 @@ class MAAModel(BertPreTrainedModel):
             self,
             input_ids=None,
             attrs=None,
-            pooledkeyword=None,
-            positivekeyword_embeddings=None,
-            negativekeyword_embeddings=None,
-            keywordlist=None,
             attention_mask=None,
             token_type_ids=None,
             position_ids=None,
@@ -178,8 +189,41 @@ class MAAModel(BertPreTrainedModel):
                 last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
             hidden_state = self.dropout(last_output)
             for i, layer in enumerate(self.ATrans_decoder):
-                hidden_state = layer(hidden_state, positivekeyword_embeddings, negativekeyword_embeddings, extend_attention_mask, self.keyword_embeddings)
-
+                hidden_state = layer(hidden_state, self.positivekeyword_embeddings, self.negativekeyword_embeddings, extend_attention_mask, self.keyword_embeddings)
+        elif self.type == 'g':
+            t_self = self.text.expand_as(usr)  # (bs, attr_dim)
+        
+            extend_attention_mask = self.get_attention_mask(attention_mask)
+        
+            if 12 >= self.cus_config.n_bertlayer > 0:
+                last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+            hidden_state = self.dropout(last_output)
+            for i, layer in enumerate(self.KWAttention):
+                hidden_state = layer(hidden_state, self.positivekeyword_embeddings, self.negativekeyword_embeddings, extend_attention_mask, self.keyword_embeddings)
+            if(self.cus_config.attributes == 'usr_ctgy'):
+                for i, mmalayer in enumerate(self.MMA):
+                    hidden_state = mmalayer([usr, ctgy, t_self], hidden_state, extend_attention_mask)
+            elif(self.cus_config.attributes == 'prd_ctgy'):
+                for i, mmalayer in enumerate(self.MMA):
+                    hidden_state = mmalayer([prd, ctgy, t_self], hidden_state, extend_attention_mask)
+            elif(self.cus_config.attributes == 'usr_prd_ctgy'):
+                for i, mmalayer in enumerate(self.MMA):
+                    hidden_state = mmalayer([usr, prd, ctgy, t_self], hidden_state, extend_attention_mask)
+            else:
+                for i, mmalayer in enumerate(self.MMA):
+                    hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)
+        elif self.type == 'h':
+            extend_attention_mask = self.get_attention_mask(attention_mask)
+            if 12 >= self.cus_config.n_bertlayer > 0:
+                last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+            hidden_state = self.dropout(last_output)
+            hidden_state = self.model(hidden_state, self.keyword_embeddings, attention_mask)
+        elif self.type == 'i':
+            extend_attention_mask = self.get_attention_mask(attention_mask)
+            if 12 >= self.cus_config.n_bertlayer > 0:
+                last_output = all_hidden_states[-(self.config.num_hidden_layers + 1 -self.cus_config.n_bertlayer)]
+            hidden_state = self.dropout(last_output)
+            hidden_state = self.model(hidden_state, self.positivekeyword_embeddings, self.negativekeyword_embeddings ,attention_mask)
         else:
             
             t_self = self.text.expand_as(usr)  # (bs, attr_dim)

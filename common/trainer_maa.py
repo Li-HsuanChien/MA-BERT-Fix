@@ -33,7 +33,7 @@ class MAATrainer(object):
         
         
         
-        model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config, interleaved_keyword_pool=keyword_pool)
+        model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config, positivekeyword_embeddings=positive_keywords, negativekeyword_embeddings=negative_keywords, interleaved_keyword_pool=keyword_pool)
         if self.config.n_gpu > 1:
             self.net = torch.nn.DataParallel(model).to(config.device)
             # self.net = model.to(config.device)
@@ -71,7 +71,7 @@ class MAATrainer(object):
 
     def empty_log(self, version):
         log_dir = self.config.log_path
-        log_filename = f"log_run_{self.config.dataset}_{self.config.version}_{self.config.attributes}_KW-{self.config.kw_attention_nums}_layers-{self.config.n_mmalayer}type-{self.config.type}.txt"
+        log_filename = f"log_run_{self.config.dataset}_{self.config.version}_{self.config.attributes}_KW-{self.config.kw_attention_nums}_mmalayers-{self.config.n_mmalayer}_kwalayers-{self.config.n_kwalayer}_type-{self.config.type}.txt"
         log_path = os.path.join(log_dir, log_filename)
 
         if os.path.exists(log_path):
@@ -101,7 +101,7 @@ class MAATrainer(object):
 
     def train(self):
         log_dir = self.config.log_path
-        log_filename = f"log_run_{self.config.dataset}_{self.config.version}_{self.config.attributes}_KW-{self.config.kw_attention_nums}_layers-{self.config.n_mmalayer}type-{self.config.type}.txt"
+        log_filename = f"log_run_{self.config.dataset}_{self.config.version}_{self.config.attributes}_KW-{self.config.kw_attention_nums}_mmalayers-{self.config.n_mmalayer}_kwalayers-{self.config.n_kwalayer}_type-{self.config.type}.txt"
         log_path = os.path.join(log_dir, log_filename)
         # Save log information
         logfile = open(
@@ -177,9 +177,6 @@ class MAATrainer(object):
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
-            pooledkw = self.keyword_itos
-            positivekw = self.pos_embeddings
-            negativekw = self.neg_embeddings
             
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
@@ -189,10 +186,6 @@ class MAATrainer(object):
             try:
                 logits = self.net(input_ids=input_ids,
                                     attrs=(usr, prd, ctgy),
-                                    pooledkeyword=pooledkw,
-                                    positivekeyword_embeddings=positivekw,
-                                    negativekeyword_embeddings=negativekw,
-                                    keywordlist = keywordlist,
                                     attention_mask=attention_mask)[0]
                 
 
@@ -255,19 +248,12 @@ class MAATrainer(object):
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
-            pooledkw = self.keyword_itos
-            positivekw = self.pos_embeddings
-            negativekw = self.neg_embeddings
             
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
             ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
             logits = self.net(input_ids=input_ids,
                                 attrs=(usr, prd, ctgy),
-                                pooledkeyword=pooledkw,
-                                positivekeyword_embeddings=positivekw,
-                                negativekeyword_embeddings=negativekw,
-                                keywordlist = keywordlist,
                                 attention_mask=attention_mask)[0]
             
 

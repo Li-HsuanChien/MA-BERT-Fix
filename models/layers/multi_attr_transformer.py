@@ -35,7 +35,7 @@ class AttributeAttention(nn.Module):
         self.attention_head_size = int(cus_config.attr_dim / cus_config.num_attr_heads)
         self.all_head_size = self.num_attr_heads * self.attention_head_size
 
-        assert self.att_type in ["a", "c", "d", "e"], print("error att_type")
+        assert self.att_type in ["a", "c", "d", "e", "f"], print("error att_type")
         if self.att_type == 'a': # a,c,d
             self.query = nn.Linear(config.hidden_size, self.all_head_size)
             self.key = nn.Linear(config.hidden_size, self.all_head_size)
@@ -46,7 +46,7 @@ class AttributeAttention(nn.Module):
             self.key = Bilinear(config.hidden_size, self.all_head_size)
             self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        if self.att_type == 'd': # a,c,d
+        if self.att_type == 'd' or self.att_type == 'f' : # a,c,d,f
             self.query = Bilinear(config.hidden_size, self.all_head_size)
             self.key = Bilinear(config.hidden_size, self.all_head_size)
             self.value = Bilinear(config.hidden_size, self.all_head_size)

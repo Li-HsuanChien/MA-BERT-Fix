@@ -24,11 +24,12 @@ __C.intermediate_size = __C.hidden_size * __C.num_attrs
 __C.hidden_act = 'gelu'
 __C.max_position_embeddings = 30
 __C.n_mmalayer = 6
+__C.n_kwalayer = 1
 __C.n_delayer = 12
 __C.n_bertlayer = 12
 __C.n_totallayer =12
 __C.kw_attention_nums = 1
-__C.type = 'e' # a, b, c, d, e, f
+__C.type = 'g' # a, b, c, d, e, f, g, h, i
 
 # ======================================= #
 # ----------- Training options ---------- #
