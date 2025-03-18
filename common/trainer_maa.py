@@ -31,8 +31,7 @@ class MAATrainer(object):
             positive_keywords = torch.cat((positive_keywords , self.pad_tensor), dim=0)
         keyword_pool = torch.stack((positive_keywords, negative_keywords), dim=1).reshape(-1, positive_keywords.shape[1])
         
-        
-        
+
         model = MAAModel.from_pretrained(pretrained_weights, num_hidden_layers=config.n_totallayer, num_labels=config.num_labels, cus_config=config, positivekeyword_embeddings=positive_keywords, negativekeyword_embeddings=negative_keywords, interleaved_keyword_pool=keyword_pool)
         if self.config.n_gpu > 1:
             self.net = torch.nn.DataParallel(model).to(config.device)

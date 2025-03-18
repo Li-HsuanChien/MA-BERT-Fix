@@ -83,13 +83,13 @@ class KWPolarattention(nn.Module):
         super(KWPolarattention, self).__init__()
         self.attentiontypepos = KWBilinearAttention(config, cus_config)
         self.attentiontypeneg = KWBilinearAttention(config, cus_config)
-        self.kwcountpos = 50
-        self.kwcountneg = 50
+        self.kwcountpos = cus_config.kw_attention_nums//2
+        self.kwcountneg = cus_config.kw_attention_nums//2
         self.batch_size = cus_config.TRAIN.batch_size 
 
         # Simple MLP (Multi-Layer Perceptron) for fusion
-        self.mlppos = nn.Linear(self.kwcountpos, 1),  # Reduce the keyword dimension to 1
-        self.mlpneg = nn.Linear(self.kwcountneg, 1),  # Reduce the keyword dimension to 1
+        self.mlppos = nn.Linear(self.kwcountpos, 1)  # Reduce the keyword dimension to 1
+        self.mlpneg = nn.Linear(self.kwcountneg, 1)  # Reduce the keyword dimension to 1
 
     def forward(self, sequence, poskeywords, negkeywords, attention_mask):
         outputspos = []
@@ -98,10 +98,10 @@ class KWPolarattention(nn.Module):
 
         # Apply attention for each keyword
         for i in range(self.kwcountpos):
-            temppos = self.attentiontypepos(sequence, poskeywords[i], attention_mask)  # Shape: (batch_size, seq_len, hidden_dimension)
+            temppos = self.attentiontypepos(sequence, poskeywords[i].unsqueeze(0), attention_mask)  # Shape: (batch_size, seq_len, hidden_dimension)
             outputspos.append(temppos)
         for i in range(self.kwcountneg):
-            tempneg = self.attentiontypeneg(sequence, negkeywords[i], attention_mask)  # Shape: (batch_size, seq_len, hidden_dimension)
+            tempneg = self.attentiontypeneg(sequence, negkeywords[i].unsqueeze(0), attention_mask)  # Shape: (batch_size, seq_len, hidden_dimension)
             outputsneg.append(tempneg)
 
         # Concatenate along the batch dimension
@@ -112,6 +112,6 @@ class KWPolarattention(nn.Module):
         fused_output_pos = self.mlppos(stacked_output_pos).squeeze(-1)  # Shape: (batch_size, seq_len, hidden_dimension, 1(kwcount))
         fused_output_neg = self.mlpneg(stacked_output_neg).squeeze(-1)  # Shape: (batch_size, seq_len, hidden_dimension, 1)
         # Squeeze the keyword dimension (size 1) to get shape (batch_size, seq_len, hidden_dimension)
-        output = torch.cat((fused_output_pos, fused_output_neg), dim=3)
+        output = torch.cat((fused_output_pos, fused_output_neg), dim=2)
 
         return output
