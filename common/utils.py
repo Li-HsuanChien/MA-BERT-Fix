@@ -389,7 +389,7 @@ def load_document4baseline_from_local(config):
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_embeddings, neg_embeddings
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_embeddings, neg_embeddings, keyword_stoi
     except Exception as e:
         print(f"Error in load_document4baseline_from_local: {e}")
         
@@ -436,7 +436,7 @@ def load_document4baseline_from_local(config):
                 train_dataset) / config.TRAIN.batch_size / config.TRAIN.gradient_accumulation_steps) * config.TRAIN.max_epoch
         print("===loading {} document from local...".format(config.BASE.strategy))
         print("Done!")
-        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_embeddings, neg_embeddings
+        return train_dataloader, dev_dataloader, test_dataloader, usr_stoi, prd_stoi, ctgy_stoi, keyword_itos, pos_embeddings, neg_embeddings, keyword_stoi
 
 
 def save_datasets(config):

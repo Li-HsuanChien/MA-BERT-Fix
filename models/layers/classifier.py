@@ -47,7 +47,6 @@ class BERTClassificationDoubleSize(nn.Module):
         self.out_proj = nn.Linear(config.hidden_size*2, config.num_labels)
 
     def forward(self, hidden_states, **kwargs):
-        hidden_states = hidden_states[:, 0]  # take <s> token (equiv. to [CLS])
         # hidden_states = self.dropout(hidden_states)
         hidden_states = self.dense(hidden_states)
         hidden_states = torch.tanh(hidden_states)

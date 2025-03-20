@@ -57,6 +57,10 @@ class SentenceProcessor(object):
                 kw_model = KeyBERT(local_model)
                 keyword_list = kw_model.extract_keywords(text, keyphrase_ngram_range=(1, 1), stop_words=None)
                 raw_keyword_list = [item[0] for item in keyword_list]
+                if(text == ""):
+                    continue
+                if(len(raw_keyword_list) == 0):
+                    continue        
                 line[5] = raw_keyword_list[0:1]
                 examples.append(
                     InputExample(guid=guid, user=line[0], product=line[1], text=text, 
@@ -344,23 +348,25 @@ class Vocab(nn.Module):
 
     def __getitem__(self, token):
         """Allows `vocab[token]` access like a dictionary."""
-        return self.stoi.get(token, self.stoi["<unk>"])  # Return index, default to "<unk>"
+        return self.stoi.get(token, self.stoi.get("<unk>", -1))  # Return index, default to "<unk>" if exists
 
     def get_itos(self):
         """Returns the index-to-string mapping."""
         return self.itos
 
     def get_stoi(self):
-        """Returns the index-to-string mapping."""
+        """Returns the string-to-index mapping."""
         return self.stoi
 
     def __len__(self):
         return len(self.itos)
 
 
-def build_vocab_from_iterator(iterator: Iterable, min_freq: int = 1, specials: Optional[list] = None, special_first: bool = True):
+def build_vocab_from_iterator(
+    iterator: Iterable, min_freq: int = 1, specials: Optional[list] = None, special_first: bool = True
+):
     """
-    Constructs a `Vocab` object from an iterator.
+    Constructs a `Vocab` object from an iterator, sorting tokens by frequency (high to low), while keeping special tokens first.
 
     Args:
         iterator (Iterable): An iterator that yields lists of tokens (e.g., sentences or documents).
@@ -377,14 +383,17 @@ def build_vocab_from_iterator(iterator: Iterable, min_freq: int = 1, specials: O
     for tokens in iterator:
         counter.update(tokens)
     
+    # Sort tokens by frequency (high to low), keeping only those meeting min_freq
+    sorted_tokens = [token for token, freq in sorted(counter.items(), key=lambda x: -x[1]) if freq >= min_freq]
+    
     # Add special tokens
     if specials is None:
         specials = []
     if special_first:
-        sorted_tokens = specials + [token for token, freq in counter.items() if freq >= min_freq]
+        sorted_tokens = specials + sorted_tokens
     else:
-        sorted_tokens = [token for token, freq in counter.items() if freq >= min_freq] + specials
-
+        sorted_tokens += specials
+    
     # Create vocabulary
     return Vocab(OrderedDict((tok, 1) for tok in sorted_tokens))
 

@@ -57,6 +57,10 @@ class MAAModel(BertPreTrainedModel):
             self.ctgy_embed = nn.Embedding(self.cus_config.num_ctgy, self.cus_config.attr_dim)
             self.ctgy_embed.weight.requires_grad = True
             self.ctgy_embed.weight = nn.Parameter(torch.rand(self.cus_config.num_ctgy, self.cus_config.attr_dim) * 0.5 - 0.25)
+        elif(self.cus_config.attributes == 'kw'):
+            self.kw_embed = nn.Embedding(self.cus_config.num_kws, self.cus_config.attr_dim)
+            self.kw_embed.weight.requires_grad = True
+            self.kw_embed.weight = nn.Parameter(torch.rand(self.cus_config.num_kws, self.cus_config.attr_dim) * 0.5 - 0.25)
         else:
             self.usr_embed = nn.Embedding(self.cus_config.num_usrs, self.cus_config.attr_dim)
             self.usr_embed.weight.requires_grad = True
@@ -143,7 +147,7 @@ class MAAModel(BertPreTrainedModel):
         pool_output = outputs[1] # pooled hidden_state over [CLS] in the last layer
         all_hidden_states, all_attentions = outputs[2:] # (bs,)
 
-        usrs, prds, ctgys = attrs # (bs, ) * 3
+        usrs, prds, ctgys, kws = attrs # (bs, ) * 3
         
         if(self.cus_config.attributes == 'usr_ctgy'):
             usr = self.usr_embed(usrs) # (bs, attr_dim)
@@ -155,6 +159,8 @@ class MAAModel(BertPreTrainedModel):
             usr = self.usr_embed(usrs) # (bs, attr_dim)
             prd = self.prd_embed(prds) # (bs, attr_dim)
             ctgy = self.ctgy_embed(ctgys) # (bs, attr_dim)
+        elif(self.cus_config.attributes == 'kw'):
+            kw = self.kw_embed(kws)  
         else:
             usr = self.usr_embed(usrs) # (bs, attr_dim)
             prd = self.prd_embed(prds) # (bs, attr_dim)
@@ -232,7 +238,7 @@ class MAAModel(BertPreTrainedModel):
                 hidden_state = layer(hidden_state, self.positivekeyword_embeddings, self.negativekeyword_embeddings, extend_attention_mask)
             hidden_state = hidden_state[:, 0]
         elif self.type == 'c' or self.type == 'd':
-            t_self = self.text.expand_as(usr)  # (bs, attr_dim)
+            t_self = self.text.expand([self.cus_config.TRAIN.batch_size, self.cus_config.attr_dim])  # (bs, attr_dim)
         
             extend_attention_mask = self.get_attention_mask(attention_mask)
         
@@ -249,11 +255,16 @@ class MAAModel(BertPreTrainedModel):
                 elif(self.cus_config.attributes == 'usr_prd_ctgy'):
                     for i, mmalayer in enumerate(self.ATrans_decoder):
                         hidden_state = mmalayer([usr, prd, ctgy, t_self], hidden_state, extend_attention_mask)
+                elif(self.cus_config.attributes == 'kw'):
+                    for i, mmalayer in enumerate(self.ATrans_decoder):
+                        hidden_state = mmalayer([kw, t_self], hidden_state, extend_attention_mask)
                 else:
                     for i, mmalayer in enumerate(self.ATrans_decoder):
                         hidden_state = mmalayer([usr, prd, t_self], hidden_state, extend_attention_mask)                        
         else:
             hidden_state = self.dropout(last_output)
+                
+        hidden_state = self.dropout(hidden_state)
         outputs = self.classifier(hidden_state)  
           
         return (outputs, hidden_state)

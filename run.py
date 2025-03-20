@@ -40,8 +40,8 @@ def parse_args():
                         type=str,
                         default="default")
     parser.add_argument('--attributes', dest='attributes',
-                        choices=['usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy'],
-                        help='{usr_prd, usr_ctgy, prd_ctgy, usr_prd_ctgy}',
+                        choices=['usr_prd', 'usr_ctgy', 'prd_ctgy', 'usr_prd_ctgy', 'kw'],
+                        help='{usr_prd, usr_ctgy, prd_ctgy, usr_prd_ctgy, kw}',
                         default='usr_prd', type=str)
 
 

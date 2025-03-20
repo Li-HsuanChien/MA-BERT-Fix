@@ -17,7 +17,7 @@ class MAATrainer(object):
         self.tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
 
         self.train_itr, self.dev_itr, self.test_itr, self.usr_stoi, \
-        self.prd_stoi, self.ctgy_stoi, self.keyword_itos, self.pos_embeddings, self.neg_embeddings = load_document4baseline_from_local(
+        self.prd_stoi, self.ctgy_stoi, self.keyword_itos, self.pos_embeddings, self.neg_embeddings, self.keyword_stoi = load_document4baseline_from_local(
             config)
         self.poskwcount = config.num_posembed
         self.negkwcount = config.num_negembed
@@ -176,15 +176,14 @@ class MAATrainer(object):
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
-            
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
             ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
-           
             
+            kw = torch.Tensor([self.keyword_stoi[x] for x in keywordlist[0]]).long().to(self.config.device)
             try:
                 logits = self.net(input_ids=input_ids,
-                                    attrs=(usr, prd, ctgy),
+                                    attrs=(usr, prd, ctgy, kw),
                                     attention_mask=attention_mask)[0]
                 
 
@@ -247,12 +246,14 @@ class MAATrainer(object):
             input_ids = input_ids.to(self.config.device)
             attention_mask = (input_ids != 100).long().to(self.config.device)  # id of <PAD> is 100
             labels = label.long().to(self.config.device)
-            
+
             usr = torch.Tensor([self.usr_stoi[x] for x in usr]).long().to(self.config.device)
             prd = torch.Tensor([self.prd_stoi[x] for x in prd]).long().to(self.config.device)
             ctgy = torch.Tensor([self.ctgy_stoi[x] for x in ctgy]).long().to(self.config.device)
+            
+            kw = torch.Tensor([self.keyword_stoi[x] for x in keywordlist[0]]).long().to(self.config.device)
             logits = self.net(input_ids=input_ids,
-                                attrs=(usr, prd, ctgy),
+                                attrs=(usr, prd, ctgy, kw),
                                 attention_mask=attention_mask)[0]
             
 

@@ -7,6 +7,9 @@ class KWMultiheadAttention(nn.Module):
         self.hidden_dim = cus_config.attr_dim
         self.num_heads = cus_config.num_attr_heads
         
+        self.query = nn.Linear(cus_config.attr_dim, cus_config.attr_dim)
+        self.key = nn.Linear(cus_config.attr_dim, cus_config.attr_dim)
+        self.value = nn.Linear(cus_config.attr_dim, cus_config.attr_dim)
 
         # Ensure hidden_dim is divisible by num_heads
         assert self.hidden_dim % self.num_heads == 0, "hidden_dim must be divisible by num_heads"
@@ -28,12 +31,14 @@ class KWMultiheadAttention(nn.Module):
         batch_size, KV_size, _ = KV.size()
         batch_size, Q_Size, _ = Q.size()
 
-        
+        Q = self.query(Q)
+        K = self.key(KV)       
+        V = self.key(KV)       
 
         
         Q = Q.view(batch_size, Q_Size, self.num_heads, self.head_dim)
-        K = KV.view(batch_size, KV_size, self.num_heads, self.head_dim)
-        V = KV.view(batch_size, KV_size, self.num_heads, self.head_dim)
+        K = K.view(batch_size, KV_size, self.num_heads, self.head_dim)
+        V = V.view(batch_size, KV_size, self.num_heads, self.head_dim)
         # Step 3: Transpose for easier dot product
         Q = Q.permute(0, 2, 1, 3)  # (batch_size, num_heads, Q_Size, head_dim)
         K = K.permute(0, 2, 1, 3)   # (batch_size, num_heads, KV_size, head_dim)
@@ -86,9 +91,10 @@ class ContextualKeywordBERT(torch.nn.Module):
         #keyword_embeddings(bs, kwcount, hidden_dim)
         keyword_embeddings = keyword_embeddings.unsqueeze(0).expand(seq_hidden_state.size(dim=0), -1, -1)
         extended_attention_mask = attention_mask.expand(-1, self.cus_config.num_attr_heads, keyword_embeddings.size(dim=1), -1)
-        enriched_keywords = self.cross_attention1(seq_hidden_state, keyword_embeddings, attention_mask)
+        
+        enriched_keywords = self.cross_attention1(seq_hidden_state, keyword_embeddings, extended_attention_mask)
 
- 
+        # Keyword is embedding Q KV is seq hidden_state
 
         # Compress keyword information using a linear layer
 
