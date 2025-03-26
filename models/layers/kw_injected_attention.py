@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+BertLayerNorm = torch.nn.LayerNorm
+from transformers.activations import gelu
 class KWMultiheadAttention(nn.Module):
     def __init__(self, cus_config):
         super().__init__()
@@ -65,55 +67,62 @@ class KWMultiheadAttention(nn.Module):
         return output
 
 
-class ContextualKeywordBERT(torch.nn.Module):
+class ContextualKeywordBERT(nn.Module):
 
     def __init__(self, cus_config):
-
         super(ContextualKeywordBERT, self).__init__()
 
         self.cus_config = cus_config
         self.cross_attention1 = KWMultiheadAttention(self.cus_config)
-
-        self.compress_keywords = torch.nn.Linear(cus_config.attr_dim, cus_config.attr_dim)  # Linear layer for compression
-
         self.cross_attention2 = KWMultiheadAttention(self.cus_config)
 
- 
+       
+
+        # LayerNorms
+        self.norm1 = BertLayerNorm(cus_config.attr_dim, eps=cus_config.layer_norm_eps)
+        self.norm2 = BertLayerNorm(cus_config.attr_dim, eps=cus_config.layer_norm_eps)
+        self.norm3 = BertLayerNorm(cus_config.attr_dim, eps=cus_config.layer_norm_eps)
+        self.norm4 = BertLayerNorm(cus_config.attr_dim, eps=cus_config.layer_norm_eps)
+
+        # Intermediate projection layers
+        self.intermediate1 = nn.Linear(cus_config.attr_dim, cus_config.intermediate_size) 
+        self.intermediate2 = nn.Linear(cus_config.attr_dim, cus_config.intermediate_size)  
+
+        self.output1 = nn.Linear(cus_config.intermediate_size, cus_config.attr_dim)  
+        self.output2 = nn.Linear(cus_config.intermediate_size, cus_config.attr_dim)  
+        
+
 
     def forward(self, seq_hidden_state, keyword_embeddings, attention_mask):
-
- 
-
-        # Initial cross-attention: keywords as queries, BERT output as keys and values
-        #keyword_embeddings(kwcount, hidden_dim)
-        #seq_hidden_state (bs, seq, hidden_dim)
         
-        #keyword_embeddings(bs, kwcount, hidden_dim)
         keyword_embeddings = keyword_embeddings.unsqueeze(0).expand(seq_hidden_state.size(dim=0), -1, -1)
-        extended_attention_mask = attention_mask.expand(-1, self.cus_config.num_attr_heads, keyword_embeddings.size(dim=1), -1)
         
-        enriched_keywords = self.cross_attention1(seq_hidden_state, keyword_embeddings, extended_attention_mask)
+        extended_attention_mask = attention_mask.expand(-1, self.cus_config.num_attr_heads, keyword_embeddings.size(dim=1), -1)
 
-        # Keyword is embedding Q KV is seq hidden_state
+        # --- First cross-attention block ---
+        enriched_keywords = self.cross_attention1(seq_hidden_state, keyword_embeddings, None)
+        midway1 = enriched_keywords + keyword_embeddings  # Add residual connection
+        midway1 = self.norm1(midway1)  # LayerNorm
 
-        # Compress keyword information using a linear layer
-
-        compressed_keywords = self.compress_keywords(enriched_keywords)
-
- 
-
-        # Extract [CLS] token representation
-
-        cls_token = seq_hidden_state[:, 0, :].unsqueeze(1)  # Shape: [batch size, 1, embedding size]
-
- 
-
-        # Second cross-attention: [CLS] token as query, compressed keywords as keys and values
-
-        cls_enriched = self.cross_attention2(compressed_keywords, cls_token)
+        # Feed-forward layer
+        hidden1 = self.intermediate1(midway1)  # TODO: Edit activation function
+        hidden1 = gelu(hidden1)  # Placeholder activation
+        hidden1 = self.output1(hidden1)
+        enriched_keywords = self.norm2(midway1 + hidden1)  # Add residual and normalize
 
 
-        # Combine [CLS] token and enriched [CLS] token information
+        # --- Second cross-attention block ---
+        cls_token = seq_hidden_state[:, 0, :].unsqueeze(1)  
+        cls_enriched = self.cross_attention2(enriched_keywords, cls_token)
+
+        midway2 = cls_enriched + cls_token  # Add residual connection
+        midway2 = self.norm3(midway2)  # LayerNorm
+
+        # Feed-forward layer
+        hidden2 = self.intermediate2(midway2)  # TODO: Edit activation function
+        hidden2 = gelu(hidden2)  # Placeholder activation
+        hidden2 = self.output2(hidden2)
+        cls_enriched = self.norm4(midway2 + hidden2)  # Add residual and normalize
 
         combined_output = torch.cat((cls_token.squeeze(1), cls_enriched.squeeze(1)), dim=-1)
         return combined_output
